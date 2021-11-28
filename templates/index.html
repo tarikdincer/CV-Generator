@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<head>
+    <title>Cv Generator</title>
+</head>
+<body>
+    <div style="text-align: center; justify-content: center;">
+        <h2>Cv Generator</h2>
+        <form action="/cv_sent" enctype=multipart/form-data method="POST">
+            <label for="Name">Researcher Name: </label>
+            <input id="Name" name="Name" type="text" placeholder="Enter your name..." required>
+            <label for="Surname">Researcher Surname: </label>
+            <input id="Surname" name="Surname" type="text" placeholder="Enter your surname..." required>
+            <label for="Url">Website URL: </label>
+            <input id="Url" name="Url" type="text" placeholder="Enter your website url...">
+            <label for="file">Select a file: </label>
+            <input id="file" name="file" type="file" accept=".doc,.docx,.pdf,.txt">
+            <input type="submit">
+        </form>
+    </div>
+</body>
+<script>
+</script>

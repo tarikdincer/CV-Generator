@@ -1,0 +1,4 @@
+model-state.bin
+venv
+__pycache__
+server/__pycache__
