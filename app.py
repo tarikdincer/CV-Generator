@@ -8,12 +8,15 @@ from transformers import BertTokenizerFast, BertForTokenClassification
 from server.utils import preprocess_data, predict, idx2tag
 from werkzeug.utils import secure_filename
 from werkzeug.datastructures import  FileStorage
-from preprocess import parse_html,condense_newline
+from preprocess import parse_html,condense_newline,traverse_web_links
 import textract
 from pdfminer.high_level import extract_text
 import psycopg2
 import re
 from scholarly import scholarly
+import pub_utils
+import json
+from difflib import SequenceMatcher
 
 app = Flask(__name__)
 conn = psycopg2.connect(database="postgres", user = "postgres", password = "admin", host = "127.0.0.1", port = "5432")
@@ -46,11 +49,21 @@ def predict_api():
 
 
 
-def predict_entities(resume_text, researcherid):
+def predict_entities(resume_text, researcherid, rname):
     entities = predict(model, TOKENIZER, idx2tag,
                            DEVICE, resume_text, MAX_LEN)
     print(entities)
+    is_relevant = True
     for entity in entities:
+        if entity['entity'] == 'Name':
+            if  SequenceMatcher(None, entity["text"], rname).ratio() > 0.7:
+                is_relevant = True
+            else:
+                is_relevant = False
+        
+        if not is_relevant:
+            continue
+        
         degree_index = 0
         designation_index = 0
         if entity['entity'] == 'Skills':
@@ -84,21 +97,33 @@ def predict_entities(resume_text, researcherid):
                 oid = insertOrganization()
             insertWork(organizationid = oid, researcherid = researcherid, wtitle = entity['text'])
     
+    
 
 def get_pubs(rid):
     # Retrieve the author's data, fill-in, and print
     res = selectResearcher(researcherid=rid)[0]
     rname = res[1] + " " + res[2]
-    search_query = scholarly.search_pubs(rname)
-    publication = next(search_query, None)
-    counter = 0
+    try:
+        pubs = pub_utils.get_pubs_from_author(rname)
+        if(len(pubs) > 0):
+            publications = json.loads(pubs)
+            for publication in publications:
+                pid = insertPublication(ptitle = publication["title"], pyear = publication["year"], venue = publication["source"], scholarurl = publication["article_url"])
+                insertCoauthor(pid, rid)
+    except:
+        print("Publications can not be accessed")
+        
 
-    while publication is not None and counter < 10:
-        publication = next(search_query, None)
-        #print(publication)
-        pid = insertPublication(ptitle = publication["bib"]["title"], pyear = publication["bib"]["pub_year"], venue = publication["bib"]["venue"], scholarurl = publication["pub_url"], bibtex = scholarly.bibtex(publication))
-        insertCoauthor(pid, rid)
-        counter += 1    
+    # search_query = scholarly.search_pubs(rname)
+    # publication = next(search_query, None)
+    # counter = 0
+
+    # while publication is not None and counter < 5:
+    #     publication = next(search_query, None)
+    #     #print(publication)
+    #     pid = insertPublication(ptitle = publication["bib"]["title"], pyear = publication["bib"]["pub_year"], venue = publication["bib"]["venue"], scholarurl = publication["pub_url"], bibtex = scholarly.bibtex(publication))
+    #     insertCoauthor(pid, rid)
+    #     counter += 1    
 
 
 @app.route("/cv_sent", methods=['POST', 'GET'])
@@ -110,13 +135,18 @@ def cv_sent():
         website_url = result["Url"]
         rid = insertResearcher(name, surname)
         get_pubs(rid)
+        url = None
 
         if website_url:
-            try:
-                web_content = parse_html(website_url)
-                predict_entities(resume_text=web_content, researcherid = rid)
-            except:
-                print("url is not accessible")
+            url = website_url
+
+        try:
+            # web_content = parse_html(website_url)
+            web_content = traverse_web_links(name + " " + surname, url)
+            predict_entities(resume_text=web_content, researcherid = rid, rname=name+" "+surname)
+        except Exception as e:
+            print(e)
+            print("web scan is not accessible")
 
         if request.files.get('file', None):
             f = request.files['file']
@@ -126,25 +156,25 @@ def cv_sent():
                 try:
                     ftxt = open(filename, 'r')
                     content = condense_newline(ftxt.read())
-                    predict_entities(resume_text=content, researcherid = rid)
+                    predict_entities(resume_text=content, researcherid = rid, rname=name+" "+surname)
                 except:
                     print("txt not found")
             elif '.doc' in filename:
                 try:
                     content = condense_newline(textract.process(filename).decode('utf-8'))
-                    predict_entities(resume_text=content)
-                except:
-                    print(filename, "doc not found")
+                    predict_entities(resume_text=content, researcherid = rid, rname=name+" "+surname)
+                except Exception as e:
+                    print(filename, "doc not found", e)
             elif '.pdf' in filename:
                 try:
                     content = condense_newline(extract_text(filename))
-                    predict_entities(resume_text=content, researcherid = rid)
+                    predict_entities(resume_text=content, researcherid = rid, rname=name+" "+surname)
                 except:
                     print("pdf not found")
             # f.save(os.path.join(app.config['UPLOAD_FOLDER'],\
             #          filename))
             #doc_pdf = weasyprint.HTML(url_for('cv_create', researcherid = rid)).write_pdf(name + '_' + surname + '_cv.pdf')
-            return redirect(url_for('cv_create', researcherid = rid))
+        return redirect(url_for('cv_create', researcherid = rid))
 
 @app.route("/")
 def index():
