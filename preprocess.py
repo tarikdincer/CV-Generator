@@ -14,6 +14,11 @@ scanned_links = []
 def condense_newline(text):
     return ' '.join([p for p in re.split('\n|\r', text) if len(p) > 0])
 
+def extract_from_url(url):
+    # Make a GET request to fetch the raw HTML content
+    html_content = requests.get(url).text
+    clean_text = ' '.join(BeautifulSoup(html_content, "html.parser").stripped_strings)
+    return clean_text
 # Returns the text from a HTML file
 def parse_html(html_path):
     # Text extraction with boilerpy3
@@ -58,7 +63,8 @@ def scan_link(link, counter = 1, rname = ""):
     content = ""
     try:
         print(link)
-        content = parse_html(link)
+        #content = parse_html(link)
+        content = extract_from_url(link)
     except Exception as e:
             print(e)
             print(link + " is not accessible")

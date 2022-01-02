@@ -1,0 +1,38 @@
+BA
+Bachelor of Arts
+BSc
+Bachelor of Sciences
+BENG
+Bachelor of Engineering
+LLB
+Bachelor of Law
+MARTS
+Masters of Arts
+MBIOL
+Masters of Biology
+MCOMP
+Masters of Computer Science
+MENG
+Masters of Engineering
+MMATH
+Masters of Mathematics
+MPHYS
+Masters of Physics
+MSCI
+Masters of Sciences and Humanities
+MS
+MSc
+Masters of Sciences
+MA
+Masters of Arts
+Masters of Arts, Humanities and Social Sciences
+MBA
+Masters of Business Administration
+MPhil
+Masters of Philosophy
+MRes
+Masters of Research
+LLM
+Masters of Law
+PhD
+Doctor of Philosophy

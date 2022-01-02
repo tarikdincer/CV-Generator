@@ -17,6 +17,9 @@ from scholarly import scholarly
 import pub_utils
 import json
 from difflib import SequenceMatcher
+import spacy
+import pandas as pd
+import re
 
 app = Flask(__name__)
 conn = psycopg2.connect(database="postgres", user = "postgres", password = "admin", host = "127.0.0.1", port = "5432")
@@ -47,7 +50,108 @@ def predict_api():
                            DEVICE, resume_text, MAX_LEN)
         return jsonify({'entities': entities})
 
+def process_ner(raw_text):
+    NER = spacy.load("en_core_web_lg")
+    print(NER.get_pipe('ner').labels)
+    text1= NER(raw_text)
+    for word in text1.ents:
+        print(word.text,word.label_)
 
+def contains_word(s, w):
+    return f' {w} ' in f' {s} '
+
+def process_keyword_analysis(lines, tolerance = 0.2):
+    #print(lines)
+    f = open("slot_keywords.json")
+    data = json.load(f)
+    current_slot = "personal"
+
+    for line in lines:
+        #find the slot of line
+        #lookup_line = line.lower()
+        line = re.sub(r'[^\w\s]', '', line).lower()
+        max_slot_conf = 0.0
+        for slot in data:
+            current_conf = 0.0
+            for w in slot["high_conf_keywords"]:
+                if(contains_word(line,w)):
+                    current_conf += 0.3
+            for w in slot["low_conf_keywords"]:
+                if(contains_word(line,w)):
+                    current_conf += 0.1
+            if(current_conf > max_slot_conf + tolerance):
+                current_slot = slot["slot"]
+                max_slot_conf = current_conf
+        
+        #keyword corpuses
+        f_1 = open("university_corpus.txt", "r", encoding="utf-8")
+        universities = [x.replace("\n", "").lower() for x in f_1.readlines() if len(x) != 0]
+        f_2 = open("department_corpus.txt", "r", encoding="utf-8")
+        departments = [x.replace("\n", "").lower() for x in f_2.readlines() if len(x) != 0]
+        f_3 = open("degree_corpus.txt", "r", encoding="utf-8")
+        degrees = [x.replace("\n", "").lower() for x in f_3.readlines() if len(x) != 0]
+        f_4 = open("job_corpus.txt", "r", encoding="utf-8")
+        jobs = [x.replace("\n", "").lower() for x in f_3.readlines() if len(x) != 0]
+        personal = dict()
+        education = dict()
+        work = dict()
+        personal["phone"] = []
+        personal["mail_adresses"] = []
+        personal["web_sites"] = []
+        education["unis"] = []
+        education["deps"] = []
+        education["degs"] = []
+        education["years"] = []
+        work["jobs"] = []
+        work["companies"] = []
+        work["unis"] = []
+        work["years"] = []
+
+        #find the attributes of line regarding to slot
+        if(current_slot == "personal"):
+            #print("personal",line)
+            phone_numbers = re.findall(r"(\d{3}[-\.\s]??\d{3}[-\.\s]??\d{4}|\(\d{3}\)\s*\d{3}[-\.\s]??\d{4}|\d{3}[-\.\s]??\d{4})", line)
+            print("phone numbers", phone_numbers)
+            mail_addresses = re.findall(r"[\w\.-]+@[\w\.-]+\.\w+", line)
+            print("mail addresses", mail_addresses)
+            web_sites = re.findall(r'''(?i)\b((?:https?:(?:/{1,3}|[a-z0-9%])|[a-z0-9.\-]+[.](?:com|net|org|edu|gov|mil|aero|asia|biz|cat|coop|info|int|jobs|mobi|museum|name|post|pro|tel|travel|xxx|ac|ad|ae|af|ag|ai|al|am|an|ao|aq|ar|as|at|au|aw|ax|az|ba|bb|bd|be|bf|bg|bh|bi|bj|bm|bn|bo|br|bs|bt|bv|bw|by|bz|ca|cc|cd|cf|cg|ch|ci|ck|cl|cm|cn|co|cr|cs|cu|cv|cx|cy|cz|dd|de|dj|dk|dm|do|dz|ec|ee|eg|eh|er|es|et|eu|fi|fj|fk|fm|fo|fr|ga|gb|gd|ge|gf|gg|gh|gi|gl|gm|gn|gp|gq|gr|gs|gt|gu|gw|gy|hk|hm|hn|hr|ht|hu|id|ie|il|im|in|io|iq|ir|is|it|je|jm|jo|jp|ke|kg|kh|ki|km|kn|kp|kr|kw|ky|kz|la|lb|lc|li|lk|lr|ls|lt|lu|lv|ly|ma|mc|md|me|mg|mh|mk|ml|mm|mn|mo|mp|mq|mr|ms|mt|mu|mv|mw|mx|my|mz|na|nc|ne|nf|ng|ni|nl|no|np|nr|nu|nz|om|pa|pe|pf|pg|ph|pk|pl|pm|pn|pr|ps|pt|pw|py|qa|re|ro|rs|ru|rw|sa|sb|sc|sd|se|sg|sh|si|sj|Ja|sk|sl|sm|sn|so|sr|ss|st|su|sv|sx|sy|sz|tc|td|tf|tg|th|tj|tk|tl|tm|tn|to|tp|tr|tt|tv|tw|tz|ua|ug|uk|us|uy|uz|va|vc|ve|vg|vi|vn|vu|wf|ws|ye|yt|yu|za|zm|zw)/)(?:[^\s()<>{}\[\]]+|\([^\s()]*?\([^\s()]+\)[^\s()]*?\)|\([^\s]+?\))+(?:\([^\s()]*?\([^\s()]+\)[^\s()]*?\)|\([^\s]+?\)|[^\s`!()\[\]{};:'".,<>?«»“”‘’])|(?:(?<!@)[a-z0-9]+(?:[.\-][a-z0-9]+)*[.](?:com|net|org|edu|gov|mil|aero|asia|biz|cat|coop|info|int|jobs|mobi|museum|name|post|pro|tel|travel|xxx|ac|ad|ae|af|ag|ai|al|am|an|ao|aq|ar|as|at|au|aw|ax|az|ba|bb|bd|be|bf|bg|bh|bi|bj|bm|bn|bo|br|bs|bt|bv|bw|by|bz|ca|cc|cd|cf|cg|ch|ci|ck|cl|cm|cn|co|cr|cs|cu|cv|cx|cy|cz|dd|de|dj|dk|dm|do|dz|ec|ee|eg|eh|er|es|et|eu|fi|fj|fk|fm|fo|fr|ga|gb|gd|ge|gf|gg|gh|gi|gl|gm|gn|gp|gq|gr|gs|gt|gu|gw|gy|hk|hm|hn|hr|ht|hu|id|ie|il|im|in|io|iq|ir|is|it|je|jm|jo|jp|ke|kg|kh|ki|km|kn|kp|kr|kw|ky|kz|la|lb|lc|li|lk|lr|ls|lt|lu|lv|ly|ma|mc|md|me|mg|mh|mk|ml|mm|mn|mo|mp|mq|mr|ms|mt|mu|mv|mw|mx|my|mz|na|nc|ne|nf|ng|ni|nl|no|np|nr|nu|nz|om|pa|pe|pf|pg|ph|pk|pl|pm|pn|pr|ps|pt|pw|py|qa|re|ro|rs|ru|rw|sa|sb|sc|sd|se|sg|sh|si|sj|Ja|sk|sl|sm|sn|so|sr|ss|st|su|sv|sx|sy|sz|tc|td|tf|tg|th|tj|tk|tl|tm|tn|to|tp|tr|tt|tv|tw|tz|ua|ug|uk|us|uy|uz|va|vc|ve|vg|vi|vn|vu|wf|ws|ye|yt|yu|za|zm|zw)\b/?(?!@)))''',line)
+            print("web sites", web_sites)
+            
+            personal["phone"] += phone_numbers
+            personal["mail_adresses"] += mail_addresses
+            personal["web_sites"] += web_sites
+        elif(current_slot == "education"):
+            #print("education",line)
+            unis =  [x for x in universities if x in line]
+            deps = [x for x in departments if x in line]
+            degs = [x for x in degrees if x in line if contains_word(line,x)]
+            years = re.findall(r'.(*([2][0][0-9]{2}))|(*([1][9][0-9]{2}))', line)
+            
+            education["unis"] += unis
+            education["deps"] += deps
+            education["degs"] += degs
+            education["years"] += years
+        elif(current_slot == "work"):
+            #print("work",line)
+            jbs =  [x for x in sorted(jobs, key=len) if contains_word(line,x)]
+            work_companies = re.findall(r"\b[A-Z]\w+(?:\.com?)?(?:[ -]+(?:&[ -]+)?[A-Z]\w+(?:\.com?)?){0,2}[,\s]+(?i:ltd|llc|inc|plc|co(?:rp)?|group|holding|gmbh)\b", line)
+            print("work companies",work_companies)
+            work_unis =  [x for x in universities if x in line]
+            print("work unis",work_unis)
+            years = re.findall(r'.(*([2][0][0-9]{2}))|(*([1][9][0-9]{2}))', line)
+            print("years",years)
+            
+            work["jobs"] += jbs
+            work["companies"] += work_companies
+            work["unis"] += work_unis
+            work["years"] += years
+
+    print("personal", personal)
+    print("education", education)
+    print("work", work) 
+            
+
+            
 
 def predict_entities(resume_text, researcherid, rname):
     entities = predict(model, TOKENIZER, idx2tag,
@@ -142,8 +246,9 @@ def cv_sent():
 
         try:
             # web_content = parse_html(website_url)
-            web_content = traverse_web_links(name + " " + surname, url)
-            predict_entities(resume_text=web_content, researcherid = rid, rname=name+" "+surname)
+            #web_content = traverse_web_links(name + " " + surname, url)
+            #predict_entities(resume_text=web_content, researcherid = rid, rname=name+" "+surname)
+            print("traversed web contents")
         except Exception as e:
             print(e)
             print("web scan is not accessible")
@@ -156,8 +261,10 @@ def cv_sent():
                 try:
                     ftxt = open(filename, 'r')
                     content = condense_newline(ftxt.read())
-                    predict_entities(resume_text=content, researcherid = rid, rname=name+" "+surname)
-                except:
+                    process_ner(content)
+                    #predict_entities(resume_text=content, researcherid = rid, rname=name+" "+surname)
+                except Exception as e:
+                    print(e)
                     print("txt not found")
             elif '.doc' in filename:
                 try:
@@ -167,9 +274,11 @@ def cv_sent():
                     print(filename, "doc not found", e)
             elif '.pdf' in filename:
                 try:
-                    content = condense_newline(extract_text(filename))
-                    predict_entities(resume_text=content, researcherid = rid, rname=name+" "+surname)
-                except:
+                    process_keyword_analysis(extract_text(filename).splitlines())
+                    #content = condense_newline(extract_text(filename))
+                    #predict_entities(resume_text=content, researcherid = rid, rname=name+" "+surname)
+                except Exception as e:
+                    print(e)
                     print("pdf not found")
             # f.save(os.path.join(app.config['UPLOAD_FOLDER'],\
             #          filename))
