@@ -7,8 +7,31 @@ import urllib
 from googlesearch import search
 import requests
 from urllib.request import urlopen
+import PyPDF4
+import re
+import io
+from tika import parser
 
 scanned_links = []
+
+def parse_pdf_tika(filename):
+    file_data = parser.from_file(filename)
+    text = file_data['content']
+    return text
+
+def parse_pdf(file_path):
+    lines = []
+    pdfFileObj = open(file_path, 'rb')
+    pdfReader = PyPDF4.PdfFileReader(pdfFileObj)
+    for i in range(pdfReader.numPages):
+        pageObj = pdfReader.getPage(i)
+        pages_text = pageObj.extractText()
+
+        for line in io.StringIO(pages_text):
+            if(len(line) != 0):
+                lines.append(line)
+    
+    return lines
 
 # Condenses all repeating newline characters into one single newline character
 def condense_newline(text):

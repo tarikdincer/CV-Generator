@@ -2749,6 +2749,7 @@ agricultural university of athens
 american college of greece
 american college of thessaloniki
 aristotle university of thessaloniki
+aristotle university
 athens graduate school of management (agsm)
 athens laboratory of business administration (alba)
 athens school of fine arts
@@ -9361,3 +9362,6 @@ university of zimbabwe
 women's university in africa
 zimbabwe ezekiel guti university
 zimbabwe open university
+saint peter’s college
+tobb university of economics and technology
+istanbul medipol university

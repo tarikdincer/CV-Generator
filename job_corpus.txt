@@ -1115,7 +1115,6 @@ supervising housing groundskeeper
 supervising nurse
 supervising physician
 supervising public health advisor
-supervisor
 support engineer
 support worker
 surgeon
@@ -1228,3 +1227,9 @@ assistant professor
 asst prof
 assoc professor
 asst professor
+faculty affiliate
+faculty fellow
+graduate fellow
+postdoctoral researcher
+graduate assistant
+research-teaching assistant
