@@ -2,6 +2,7 @@ import os
 import re
 from boilerpy3 import extractors
 from bs4 import BeautifulSoup, SoupStrainer
+from flask import app
 import requests
 import urllib
 from googlesearch import search
@@ -11,6 +12,8 @@ import PyPDF4
 import re
 import io
 from tika import parser
+from process import process_keyword_analysis
+
 
 scanned_links = []
 
@@ -37,16 +40,19 @@ def parse_pdf(file_path):
 def condense_newline(text):
     return ' '.join([p for p in re.split('\n|\r', text) if len(p) > 0])
 
+def split_newline(text):
+    return [p for p in re.split('\n|\r', text) if len(p) > 0]
+
 def extract_from_url(url):
     # Make a GET request to fetch the raw HTML content
     html_content = requests.get(url).text
-    clean_text = ' '.join(BeautifulSoup(html_content, "html.parser").stripped_strings)
+    clean_text = '\n'.join(BeautifulSoup(html_content, "html.parser").stripped_strings)
     return clean_text
 # Returns the text from a HTML file
 def parse_html(html_path):
     # Text extraction with boilerpy3
     html_extractor = extractors.KeepEverythingExtractor()
-    return condense_newline(html_extractor.get_content_from_url(html_path))
+    return split_newline(html_extractor.get_content_from_url(html_path))
 
 def traverse_web_links(rname, url = None):
     cv_content = ""
@@ -68,14 +74,18 @@ def traverse_web_links(rname, url = None):
     for j in search(query, num=10, stop=3, pause=2): 
         link_tree.append(j)
     
+    persons = []
+    
     for link in link_tree:
         scanned_content = scan_link(link, 0, rname)
         if(scanned_content):
-            cv_content = cv_content + "\n" + scanned_content
-    print(link_tree)
-    print("content: " + cv_content)
-    print(cv_content)
-    return cv_content
+            persons.append(process_keyword_analysis(lines=split_newline(scanned_content), rname=rname))
+            # cv_content = cv_content + "\n" + scanned_content
+    
+    # print(link_tree)
+    # print("content: " + cv_content)
+    # print(cv_content)
+    return persons
 
 
 def scan_link(link, counter = 1, rname = ""):
@@ -88,6 +98,7 @@ def scan_link(link, counter = 1, rname = ""):
         print(link)
         #content = parse_html(link)
         content = extract_from_url(link)
+        #print(content)
     except Exception as e:
             print(e)
             print(link + " is not accessible")
