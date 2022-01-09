@@ -8,6 +8,8 @@ import json
 import re
 import pub_utils
 import psycopg2
+import pyap
+import traceback
 
 conn = psycopg2.connect(database="postgres", user = "postgres", password = "admin", host = "127.0.0.1", port = "5432")
 cur = conn.cursor()
@@ -54,6 +56,7 @@ def predict_skills(resume_text, rname):
     entities = predict(model, TOKENIZER, idx2tag,
                            DEVICE, resume_text, MAX_LEN)
     skills = []
+    addresses = []
     print("entities",entities)
     is_relevant = True
     for entity in entities:
@@ -71,36 +74,56 @@ def predict_skills(resume_text, rname):
             skills = r.findall(entity["text"])
             for skill in skills:
                 for skill_sep in skill.split(' and'):
-                    if(skill_sep not in skills):
-                        skills.append(skill_sep)
-                    #insertSkill(sname = skill_sep, researcherid = researcherid)   
+                    for skill_sep_2 in skill_sep.split('&'):
+                        if(skill_sep_2 not in skills):
+                            skills.append(skill_sep_2.strip())
+                    #insertSkill(sname = skill_sep, researcherid = researcherid)  
+        if entity['entity'] == 'Location':
+            addresses.append(entity["text"])
+        
 
-    return skills
+    return skills, addresses
 
 
 def contains_word(s, w):
     return f' {w} ' in f' {s} '
 
-def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = ""):
-    resume_text = " ".join(lines)
-    skills = predict_skills(resume_text=resume_text, rname=rname)
-    print("skills",skills)
-    print(lines)
+def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "", block_threshold = 3):
     lines = [line for line in lines if len(line.strip()) != 0]
+    resume_text = " ".join(lines)
+    #address = ""
+    # streets = re.findall(r"\d{1,4} [\w\s]{1,20}(?:street|st|avenue|ave|road|rd|highway|hwy|square|sq|trail|trl|drive|dr|court|ct|park|parkway|pkwy|circle|cir|boulevard|blvd)\W?(?=\s|$)", resume_text, re.IGNORECASE)
+    # if(len(streets) != 0):
+    #     print("street",streets)
+    #     street_index = resume_text.index(streets[0])
+    #     f_5 = open("job_corpus.txt", "r", encoding="utf-8")
+    #     countries = [x.replace("\n", "").lower() for x in f_5.readlines() if len(x) != 0]
+    #     found_countries = [x for x in countries if x.lower() in resume_text.lower() if contains_word(resume_text.lower(),x.lower())]
+    #     if(len(found_countries) != 0):
+    #         country_index = resume_text[street_index:].lower().index(found_countries[0].lower())
+    #         if(country_index - street_index > 60):
+    #             address = resume_text[street_index:country_index + len(found_countries[0])]
+
+        
+    #addresses = pyap.parse("6 King’s College Rd., Toronto, Ontario, Canada M5S 3G4", country='US')
+    skills, addresses = predict_skills(resume_text=re.sub(r'[^\w\s]', ' ', resume_text), rname=rname)
+    print("skills",skills)
+    print("addresses",addresses)
+    #print("lines",lines)
     f = open("slot_keywords.json")
     data = json.load(f)
     current_slot = "personal"
     person = dict()
     person["personal"] = dict()
+    person["personal"]["address"] = addresses[0] if len(addresses) != 0 else ""
     person["education"] = []
     person["work"] = []
     person["skills"] = skills
     education_starvation = 0
     work_starvation = 0
-    c = 0
-
+    #c = 0
+    slot_lines = []
     for line in lines:
-        #find the slot of line
         lookup_line = line
         line = re.sub(r'[^\w\s]', '', line).lower()
         max_slot_conf = 0.0
@@ -114,8 +137,53 @@ def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "")
                     current_conf += 0.1
             if(current_conf > max_slot_conf + tolerance):
                 current_slot = slot["slot"]
-                print(slot["slot"], line)
-                max_slot_conf = current_conf
+        slot_lines.append({"slot": current_slot, "line": line})
+    c = 0
+    previous_slot = ""
+    block_index = dict()
+    for index, slot_line in enumerate(slot_lines):
+        if(slot_line["slot"] == previous_slot):
+            c += 1
+        else:
+            c = 0
+        if(c == block_threshold):
+            if previous_slot not in block_index:
+                block_index[previous_slot] = index - block_threshold
+        previous_slot = slot_line["slot"]
+
+
+    print(block_index)
+    for index, line in enumerate(lines):
+        #find the slot of line
+        
+        current_slot = ""
+        try:
+            for slot, i in block_index.items():
+                if i <= index:
+                    current_slot = slot
+                #print(slot, i)
+        except Exception as e:
+                    print(traceback.format_exc())
+                    print(e)
+                    
+        
+        lookup_line = line
+        line = re.sub(r'[^\w\s]', '', line).lower()
+        print(current_slot, line)
+        
+        # max_slot_conf = 0.0
+        # for slot in data:
+        #     current_conf = 0.0
+        #     for w in slot["high_conf_keywords"]:
+        #         if(contains_word(line,w)):
+        #             current_conf += 0.3
+        #     for w in slot["low_conf_keywords"]:
+        #         if(contains_word(line,w)):
+        #             current_conf += 0.1
+        #     if(current_conf > max_slot_conf + tolerance):
+        #         current_slot = slot["slot"]
+        #         #print(slot["slot"], line)
+        #         max_slot_conf = current_conf
         
         #keyword corpuses
         f_1 = open("university_corpus.txt", "r", encoding="utf-8")
@@ -175,6 +243,8 @@ def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "")
                     person["education"][-1]["department"] = deps[0]
             
             if(len(years) != 0):
+                if(len(person["education"]) == 0):
+                    person["education"].append(dict())
                 person["education"][-1]["end_year"] = years[-1]
                 person["education"][-1]["start_year"] = years[0] if len(years) == 2 else ""
 
@@ -222,6 +292,8 @@ def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "")
                     person["work"][-1]["department"] = deps[0]
             
             if(len(years) != 0 and len(person["work"]) != 0):
+                if(len(person["work"]) == 0):
+                    person["work"].append(dict())
                 person["work"][-1]["end_year"] = years[-1]
                 person["work"][-1]["start_year"] = years[0] if len(years) == 2 else ""
             

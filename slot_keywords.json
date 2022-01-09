@@ -1,6 +1,7 @@
 [{"slot": "personal", "high_conf_keywords": ["name", "phone","telephone","tel","email","mail","fax","contact","personal information","mobile"], "low_conf_keywords": ["web","homepage","url","position","website","person"]},
 {"slot": "education", "high_conf_keywords": ["academic","education","educational","degrees","phd","bachelor","master","doctoral"], "low_conf_keywords": ["university","applied","engineering","college","aa", "aas","as","bas","barch","ba","bba","bfa","bs","mba","med","mfa","llm","mpa","mph","mpub","ms","msc","msw","dba","dds","edd","md"]},
-{"slot": "work", "high_conf_keywords": ["work","employment","professor","prof","associate", "assoc","lecturer","lect","senior","sr","assistant","postdoctoral","postdoc","researcher","intern","engineer","scientist"], "low_conf_keywords": ["university","industry","experience","fellow"]},
-{"slot": "service", "high_conf_keywords": ["service", "member", "services", "co-chair", "chair", "leadership"], "low_conf_keywords": []},
+{"slot": "work", "high_conf_keywords": ["work","experience","professor","prof","associate", "assoc","lecturer","lect","senior","sr","assistant","postdoctoral","postdoc","researcher","intern","engineer","scientist"], "low_conf_keywords": ["university","industry","experience","fellow"]},
+{"slot": "service", "high_conf_keywords": ["service", "services"], "low_conf_keywords": []},
 {"slot": "award", "high_conf_keywords": ["award", "awards", "honour", "honours", "distinction", "distinctions"], "low_conf_keywords": ["first","second","third","excellence","outstanding","best","golden","medal"]},
-{"slot": "publication", "high_conf_keywords": ["publication", "publications", "paper", "papers", "author", "co-author", "journal","journals"], "low_conf_keywords": []}]
+{"slot": "publication", "high_conf_keywords": ["publication", "publications", "paper", "papers", "author", "co-author", "journal","journals"], "low_conf_keywords": []},
+{"slot": "research_interests", "high_conf_keywords": ["research", "interest", "interests", "research interests"], "low_conf_keywords": []}]
