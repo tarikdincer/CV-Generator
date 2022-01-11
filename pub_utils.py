@@ -2,7 +2,7 @@ import subprocess
 
 
 def get_pubs_from_author(author_name):
-    process = subprocess.Popen(['pop8query', '--crossref','--author="'+ author_name +'"', '--format=json', '--max=10'], 
+    process = subprocess.Popen(['pop8query', '--crossref','--author="'+ author_name +'"', '--format=json', '--max=20'], 
                             stdout=subprocess.PIPE,
                             universal_newlines=True, encoding='utf-8')
     #outf = open("outf.txt", "w", encoding="utf-8")

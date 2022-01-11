@@ -55,6 +55,7 @@ def cv_sent():
             #predict_entities(resume_text=web_content, researcherid = rid, rname=name+" "+surname)
             print("traversed web contents")
         except Exception as e:
+            print(traceback.format_exc())
             print(e)
             print("web scan is not accessible")
 
@@ -105,6 +106,88 @@ def cv_sent():
 def index():
     return render_template("index.html")
 
+# @app.route("/select_people", methods=['POST', 'GET'])
+# def select_people():
+#     #rid = request.args.get('researcherid')
+#     people = session["persons"]
+#     print("session", session)
+#     if people is None:
+#         return "Please add people parameter"
+#     # if rid is None:
+#     #     return "Please add researcherid parameter"
+    
+#     people_tabs = ""
+#     people_contents = ""
+#     for i, person in enumerate(people):
+#         #person = json.loads(person_str)
+#         isActive = ""
+#         if(i == 0):
+#             isActive = "active"
+#         people_tabs += f'''
+#         <li class="nav-item" role="presentation">
+#             <button class="nav-link {isActive}" id="p{i}-tab" data-bs-toggle="tab" href="#p{i}" data-bs-target="#p{i}" type="button" role="tab" aria-controls="home" aria-selected="true">{i}</button>
+#         </li>
+#         '''
+#     for i, person in enumerate(people):
+#         isActive = ""
+#         if(i == 0):
+#             isActive = "show active"
+#         #person = json.loads(person_str)
+#         education_html = "<h3> Education </h3>"
+#         for education in person["education"]:
+#             education_html += f'''<div>
+#             <h5> {education["degree"] if "degree" in education else ""} </h5>
+#             <p> {education["university"] if "university" in education else ""} </p>
+#             <p> {education["department"] if "department" in education else ""} </p>
+#             <p> {education["start_year"] if "start_year" in education else ""} </p>
+#             <p> {education["end_year"] if "end_year" in education else ""} </p>
+#             </div>'''
+#         work_html = "<h3> Work Experience </h3>"
+#         for work in person["work"]:
+#             work_html += f'''<div>
+#             <h5> {work["job_title"] if "job_title" in work else ""} </h5>
+#             <p> {work["work_place"] if "work_place" in work else ""} </p>
+#             <p> {work["department"] if "department" in work else ""} </p>
+#             <p> {work["start_year"] if "start_year" in work else ""} </p>
+#             <p> {work["end_year"] if "end_year" in work else ""} </p>
+#             </div>'''
+#         skill_html = "<h3> Skills </h3>"
+#         for skill in person["skills"]:
+#             skill_html += f'''<div>
+#             <p> {skill} </p>
+#             </div>'''
+#         # pub_html = "<h3> Publications </h3>"
+#         # for pub in pubs:
+#         #     pub_html += f'''<div>
+#         #     <h5> {pub[0]} ({pub[1]}) </h5>
+#         #     </div>'''
+
+#         people_contents += f'''<div class="tab-pane fade {isActive}" id="p{i}" role="tabpanel" aria-labelledby="p{i}-tab">
+#             {education_html}
+#             {work_html}
+#             {skill_html}
+#         </div>
+#         '''
+#     return f"""
+#     <!DOCTYPE html>
+#     <head>
+#         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.2/dist/css/bootstrap.min.css" rel="stylesheet">
+#     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.2/dist/js/bootstrap.bundle.min.js"></script>
+#         <title>Cv Generator</title>
+#     </head>
+#     <body>
+#         <div class="container-fluid p-5 bg-primary text-white text-center">
+#             <h2> Who are you looking for? </h2>
+#             <ul class="nav nav-tabs" id="myTab" role="tablist">
+#             {people_tabs}
+#             </ul>
+#             <div class="tab-content" id="myTabContent">
+#             {people_contents}
+#             </div>
+#         </div>
+#     </body>
+#     """
+
 @app.route("/select_people", methods=['POST', 'GET'])
 def select_people():
     #rid = request.args.get('researcherid')
@@ -118,52 +201,83 @@ def select_people():
     people_tabs = ""
     people_contents = ""
     for i, person in enumerate(people):
-        #person = json.loads(person_str)
         isActive = ""
         if(i == 0):
             isActive = "active"
         people_tabs += f'''
         <li class="nav-item" role="presentation">
-            <button class="nav-link {isActive}" id="p{i}-tab" data-bs-toggle="tab" href="#p{i}" data-bs-target="#p{i}" type="button" role="tab" aria-controls="home" aria-selected="true">{i}</button>
+            <button class="nav-link {isActive}" id="p{i}-tab" data-bs-toggle="tab" href="#p{i}" data-bs-target="#p{i}" type="button" role="tab" aria-controls="home" aria-selected="true">Person #{i+1}</button>
         </li>
         '''
     for i, person in enumerate(people):
         isActive = ""
         if(i == 0):
             isActive = "show active"
-        #person = json.loads(person_str)
-        education_html = "<h3> Education </h3>"
+        
+        personal_html = f'''<h2> CV </h2>
+        <table> 
+            <tr> 
+                <th> Name Surname: </th> 
+                <td> {person["personal"]["name"] if "name" in person["personal"] else ""} </td> 
+            </tr>
+            <tr> 
+                <th> Phone: </th> 
+                <td> {person["personal"]["phone"] if "phone" in person["personal"] else ""} </td> 
+            </tr>
+            <tr> 
+                <th> Mail: </th> 
+                <td> {person["personal"]["mail"] if "mail" in person["personal"] else ""} </td> 
+            </tr>
+            <tr> 
+                <th> Web Site: </th> 
+                <td> {person["personal"]["web_site"] if "web_site" in person["personal"] else ""} </td> 
+            </tr>
+            <tr> 
+                <th> Address: </th> 
+                <td> {person["personal"]["address"] if "address" in person["personal"] else ""} </td> 
+            </tr>
+        </table>'''
+        
+        
+        education_html = "<h3> Education </h3> <table> <tr> <th> Degree </th> <th> Department </th> <th> University </th> <th> Date </th> </tr>"
         for education in person["education"]:
-            education_html += f'''<div>
-            <h5> {education["degree"] if "degree" in education else ""} </h5>
-            <p> {education["university"] if "university" in education else ""} </p>
-            <p> {education["department"] if "department" in education else ""} </p>
-            <p> {education["start_year"] if "start_year" in education else ""} </p>
-            <p> {education["end_year"] if "end_year" in education else ""} </p>
-            </div>'''
-        work_html = "<h3> Work Experience </h3>"
+            education_html += f'''
+            <tr>
+                <td> {education["degree"] if "degree" in education else ""} </td>
+                <td> {education["department"] if "department" in education else ""} </td>
+                <td> {education["university"] if "university" in education else ""} </td>
+                <td> {education["start_year"] if "start_year" in education else ""} - {education["end_year"] if "end_year" in education else ""} </td>
+            </tr>'''
+        education_html += "</table>"
+
+        work_html = "<h3> Work </h3> <table> <tr> <th> Title </th> <th> Department </th> <th> Place </th> <th> Date </th> </tr>"
         for work in person["work"]:
-            work_html += f'''<div>
-            <h5> {work["job_title"] if "job_title" in work else ""} </h5>
-            <p> {work["work_place"] if "work_place" in work else ""} </p>
-            <p> {work["department"] if "department" in work else ""} </p>
-            <p> {work["start_year"] if "start_year" in work else ""} </p>
-            <p> {work["end_year"] if "end_year" in work else ""} </p>
-            </div>'''
+            work_html += f'''
+            <tr>
+                <td> {work["job_title"] if "job_title" in work else ""} </td>
+                <td> {work["department"] if "department" in work else ""} </td>
+                <td> {work["work_place"] if "work_place" in work else ""} </td>
+                <td> {work["start_year"] if "start_year" in work else ""} - {work["end_year"] if "end_year" in work else ""} </td>
+            </tr>'''
+        work_html += "</table>"
+
         skill_html = "<h3> Skills </h3>"
         for skill in person["skills"]:
             skill_html += f'''<div>
             <p> {skill} </p>
             </div>'''
-        # pub_html = "<h3> Publications </h3>"
-        # for pub in pubs:
-        #     pub_html += f'''<div>
-        #     <h5> {pub[0]} ({pub[1]}) </h5>
-        #     </div>'''
 
-        people_contents += f'''<div class="tab-pane fade {isActive}" id="p{i}" role="tabpanel" aria-labelledby="p{i}-tab">
+        pub_html = "<h3> Publications </h3>"
+        for pub in person["publications"]:
+            pub_html += f'''<div>
+            <p> {pub["title"]} , {pub["year"]}</p>
+            </div>'''
+
+        people_contents += f'''<div class="m-5 tab-pane fade {isActive}" id="p{i}" role="tabpanel" aria-labelledby="p{i}-tab">
+            {personal_html}
             {education_html}
             {work_html}
+            {pub_html}
             {skill_html}
         </div>
         '''
@@ -175,17 +289,18 @@ def select_people():
         <title>Cv Generator</title>
     </head>
     <body>
-        <div class="container-fluid p-5 bg-primary text-white text-center">
+        <div class="container-fluid p-5 bg-dark text-white text-center">
             <h2> Who are you looking for? </h2>
             <ul class="nav nav-tabs" id="myTab" role="tablist">
-            {people_tabs}
+                {people_tabs}
             </ul>
-            <div class="tab-content" id="myTabContent">
+        </div>
+        <div class="tab-content" id="myTabContent">
             {people_contents}
-            </div>
         </div>
     </body>
     """
+
 
 @app.route("/cv_create", methods=['POST', 'GET'])
 def cv_create():

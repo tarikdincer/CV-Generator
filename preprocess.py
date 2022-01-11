@@ -13,6 +13,7 @@ import re
 import io
 from tika import parser
 from process import process_keyword_analysis
+import spacy
 
 
 scanned_links = []
@@ -74,12 +75,20 @@ def traverse_web_links(rname, url = None):
     for j in search(query, num=10, stop=3, pause=2): 
         link_tree.append(j)
     
+    query = rname + " university biography"
+
+    for j in search(query, num=10, stop=3, pause=2): 
+        link_tree.append(j)
+    
     persons = []
     
     for link in link_tree:
         scanned_content = scan_link(link, 0, rname)
         if(scanned_content):
-            persons.append(process_keyword_analysis(lines=split_newline(scanned_content), rname=rname))
+            nlp = spacy.load("en_core_web_sm")
+            doc = nlp(scanned_content)
+            sents = [" ".join(x.text.strip().replace("\n"," ").replace("\t", " ").split()) for x in doc.sents if len(x.text) != 0]
+            persons.append(process_keyword_analysis(lines=sents, rname=rname))
             # cv_content = cv_content + "\n" + scanned_content
     
     # print(link_tree)

@@ -55,9 +55,9 @@ def find_departments_by_pattern(text, department_keywords = ["department"], degr
 def predict_skills(resume_text, rname):
     entities = predict(model, TOKENIZER, idx2tag,
                            DEVICE, resume_text, MAX_LEN)
-    skills = []
+    found_skills = []
     addresses = []
-    print("entities",entities)
+    #print("entities",entities)
     is_relevant = True
     for entity in entities:
         if entity['entity'] == 'Name':
@@ -75,14 +75,14 @@ def predict_skills(resume_text, rname):
             for skill in skills:
                 for skill_sep in skill.split(' and'):
                     for skill_sep_2 in skill_sep.split('&'):
-                        if(skill_sep_2 not in skills):
-                            skills.append(skill_sep_2.strip())
+                        if(skill_sep_2 not in found_skills):
+                            found_skills.append(skill_sep_2.strip())
                     #insertSkill(sname = skill_sep, researcherid = researcherid)  
         if entity['entity'] == 'Location':
             addresses.append(entity["text"])
         
 
-    return skills, addresses
+    return found_skills, addresses
 
 
 def contains_word(s, w):
@@ -90,39 +90,33 @@ def contains_word(s, w):
 
 def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "", block_threshold = 3):
     lines = [line for line in lines if len(line.strip()) != 0]
+    print("lines", lines)
     resume_text = " ".join(lines)
-    #address = ""
-    # streets = re.findall(r"\d{1,4} [\w\s]{1,20}(?:street|st|avenue|ave|road|rd|highway|hwy|square|sq|trail|trl|drive|dr|court|ct|park|parkway|pkwy|circle|cir|boulevard|blvd)\W?(?=\s|$)", resume_text, re.IGNORECASE)
-    # if(len(streets) != 0):
-    #     print("street",streets)
-    #     street_index = resume_text.index(streets[0])
-    #     f_5 = open("job_corpus.txt", "r", encoding="utf-8")
-    #     countries = [x.replace("\n", "").lower() for x in f_5.readlines() if len(x) != 0]
-    #     found_countries = [x for x in countries if x.lower() in resume_text.lower() if contains_word(resume_text.lower(),x.lower())]
-    #     if(len(found_countries) != 0):
-    #         country_index = resume_text[street_index:].lower().index(found_countries[0].lower())
-    #         if(country_index - street_index > 60):
-    #             address = resume_text[street_index:country_index + len(found_countries[0])]
 
-        
+    #re.compile('\d{1,4} [\w\s]{1,20}(?:street|st|avenue|ave|road|rd|highway|hwy|square|sq|trail|trl|drive|dr|court|ct|park|parkway|pkwy|circle|cir|boulevard|blvd)\W?(?=\s|$)', re.IGNORECASE)
     #addresses = pyap.parse("6 King’s College Rd., Toronto, Ontario, Canada M5S 3G4", country='US')
     skills, addresses = predict_skills(resume_text=re.sub(r'[^\w\s]', ' ', resume_text), rname=rname)
-    print("skills",skills)
-    print("addresses",addresses)
+    # print("skills",skills)
+    # print("addresses",addresses)
     #print("lines",lines)
     f = open("slot_keywords.json")
     data = json.load(f)
     current_slot = "personal"
     person = dict()
     person["personal"] = dict()
+    person["personal"]["name"] = rname
     person["personal"]["address"] = addresses[0] if len(addresses) != 0 else ""
     person["education"] = []
     person["work"] = []
+    person["publications"] = []
     person["skills"] = skills
+    publications = get_pubs(rname)
     education_starvation = 0
     work_starvation = 0
     #c = 0
     slot_lines = []
+    personal_lines = ""
+    publication_lines = ""
     for line in lines:
         lookup_line = line
         line = re.sub(r'[^\w\s]', '', line).lower()
@@ -169,7 +163,7 @@ def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "",
         
         lookup_line = line
         line = re.sub(r'[^\w\s]', '', line).lower()
-        print(current_slot, line)
+        #print(current_slot, line)
         
         # max_slot_conf = 0.0
         # for slot in data:
@@ -195,8 +189,10 @@ def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "",
         f_4 = open("job_corpus.txt", "r", encoding="utf-8")
         jobs = [x.replace("\n", "").lower() for x in f_4.readlines() if len(x) != 0]
         #find the attributes of line regarding to slot
+        
         if(current_slot == "personal"):
             #print("personal",line)
+            personal_lines += " " + line
             phone_numbers = re.findall(r"(\d{3}[-\.\s]??\d{3}[-\.\s]??\d{4}|\(\d{3}\)\s*\d{3}[-\.\s]??\d{4}|\d{3}[-\.\s]??\d{4})", lookup_line)
             if len(phone_numbers) != 0:
                 person["personal"]["phone"] = phone_numbers[0]
@@ -299,11 +295,71 @@ def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "",
             
             if(len(works) == 0 and len(jbs) == 0 and len(years) == 0):
                 work_starvation += 1
+        
+        elif(current_slot == "publication"):
+            publication_lines += " " + line.lower()
+
+    #print("pub lines", publication_lines)
+    #print(publications)
+    for pub in publications:
+        if("title" not in pub):
+            continue
+        title = re.sub(r'[^\w\s]', '', pub['title']).lower().strip()
+        #print("title", title)
+        if(len(title) != 0 and title in publication_lines):
+            person["publications"] = [x for x in publications if "title" in x and "year" in x]
+            break
+    
+    address = ""
+    #print("personal lines", personal_lines)
+    streets = re.findall('\d{1,4} [\w\s]{1,20}(?:street|st|avenue|ave|road|rd|highway|hwy|square|sq|trail|trl|drive|dr|court|ct|park|parkway|pkwy|circle|cir|boulevard|blvd)\W?(?=\s|$)', personal_lines, re.IGNORECASE)
+    #print("streets", streets)
+    if(len(streets) != 0):
+        print("street",streets)
+        street_index = personal_lines.index(streets[0])
+        f_5 = open("country_corpus.txt", "r", encoding="utf-8")
+        countries = [x.replace("\n", "").lower() for x in f_5.readlines() if len(x) != 0]
+        #print(countries)
+        found_countries = [x for x in countries if x.lower() in personal_lines[street_index:].lower() if contains_word(personal_lines[street_index:].lower(),x.lower())]
+        print(found_countries)
+        if(len(found_countries) != 0):
+            country_index = personal_lines[street_index:].lower().index(found_countries[0].lower())
+            if(country_index - street_index < 60):
+                address = personal_lines[street_index:street_index + country_index + len(found_countries[0])]
+                print("personal address", address)
+                person["personal"]["address"] = address
+            else:
+                f_6 = open("city_corpus.txt", "r", encoding="utf-8")
+                cities = [x.replace("\n", "").lower() for x in f_6.readlines() if len(x) != 0]
+                found_cities = [x for x in cities if x.lower() in personal_lines[street_index:].lower() if contains_word(personal_lines[street_index:].lower(),x.lower())]
+                if(len(found_cities) != 0):
+                    city_index = personal_lines[street_index:].lower().index(found_cities[0].lower())
+                    if(city_index - street_index < 60):
+                        address = personal_lines[street_index:street_index + city_index + len(found_cities[0])]
+                        print("personal address", address)
+                        person["personal"]["address"] = address
+                    else:
+                        person["personal"]["address"] = streets[0]
+        else:
+            f_6 = open("city_corpus.txt", "r", encoding="utf-8")
+            cities = [x.replace("\n", "").lower() for x in f_6.readlines() if len(x) != 0]
+            found_cities = [x for x in cities if x.lower() in personal_lines.lower() if contains_word(personal_lines.lower(),x.lower())]
+            if(len(found_cities) != 0):
+                city_index = personal_lines[street_index:].lower().index(found_cities[0].lower())
+                if(city_index - street_index < 60):
+                    address = personal_lines[street_index:street_index + city_index + len(found_cities[0])]
+                    print("personal address", address)
+                    person["personal"]["address"] = address
+                else:
+                    person["personal"]["address"] = streets[0]
+
+            
     
     pruned_person = dict()
     pruned_person["personal"] = person["personal"]
     pruned_person["education"] = []
     pruned_person["work"] = []
+    pruned_person["publications"] = person["publications"]
     pruned_person["skills"] = skills
 
     for education in person["education"]:
@@ -317,7 +373,7 @@ def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "",
                 pruned_person["work"].append(work)
             
 
-    print(pruned_person)
+    #print(pruned_person)
     return pruned_person
 
 def predict_entities(resume_text, researcherid, rname):
@@ -375,19 +431,31 @@ def predict_entities(resume_text, researcherid, rname):
                 oid = insertOrganization()
             insertWork(organizationid = oid, researcherid = researcherid, wtitle = entity['text'])
 
-def get_pubs(rid):
+# def get_pubs(rid):
+#     # Retrieve the author's data, fill-in, and print
+#     res = selectResearcher(researcherid=rid)[0]
+#     rname = res[1] + " " + res[2]
+#     try:
+#         pubs = pub_utils.get_pubs_from_author(rname)
+#         if(len(pubs) > 0):
+#             publications = json.loads(pubs)
+#             for publication in publications:
+#                 pid = insertPublication(ptitle = publication["title"], pyear = publication["year"], venue = publication["source"], scholarurl = publication["article_url"])
+#                 insertCoauthor(pid, rid)
+#     except:
+#         print("Publications can not be accessed")
+
+def get_pubs(rname):
     # Retrieve the author's data, fill-in, and print
-    res = selectResearcher(researcherid=rid)[0]
-    rname = res[1] + " " + res[2]
+    publications = []
     try:
         pubs = pub_utils.get_pubs_from_author(rname)
         if(len(pubs) > 0):
             publications = json.loads(pubs)
-            for publication in publications:
-                pid = insertPublication(ptitle = publication["title"], pyear = publication["year"], venue = publication["source"], scholarurl = publication["article_url"])
-                insertCoauthor(pid, rid)
     except:
         print("Publications can not be accessed")
+    
+    return publications
 
 def insertResearcher(rname = "", rlastname = "", orchid=0):
     cur.execute(f"INSERT INTO researcher (rname, rlastname, orchid) \
