@@ -90,7 +90,7 @@ def contains_word(s, w):
 
 def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "", block_threshold = 3):
     lines = [line for line in lines if len(line.strip()) != 0]
-    print("lines", lines)
+    #print("lines", lines)
     resume_text = " ".join(lines)
 
     #re.compile('\d{1,4} [\w\s]{1,20}(?:street|st|avenue|ave|road|rd|highway|hwy|square|sq|trail|trl|drive|dr|court|ct|park|parkway|pkwy|circle|cir|boulevard|blvd)\W?(?=\s|$)', re.IGNORECASE)
@@ -151,15 +151,28 @@ def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "",
         #find the slot of line
         
         current_slot = ""
-        try:
-            for slot, i in block_index.items():
-                if i <= index:
-                    current_slot = slot
-                #print(slot, i)
-        except Exception as e:
-                    print(traceback.format_exc())
-                    print(e)
-                    
+        if(len(block_index) > 0):
+            try:
+                for slot, i in block_index.items():
+                    if i <= index:
+                        current_slot = slot
+                    #print(slot, i)
+            except Exception as e:
+                        print(traceback.format_exc())
+                        print(e)
+        else:
+            max_slot_conf = 0.0
+            for slot in data:
+                current_conf = 0.0
+                for w in slot["high_conf_keywords"]:
+                    if(contains_word(line,w)):
+                        current_conf += 0.3
+                for w in slot["low_conf_keywords"]:
+                    if(contains_word(line,w)):
+                        current_conf += 0.1
+                if(current_conf > max_slot_conf + tolerance):
+                    current_slot = slot["slot"]
+                    max_slot_conf = current_conf
         
         lookup_line = line
         line = re.sub(r'[^\w\s]', '', line).lower()
@@ -312,7 +325,7 @@ def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "",
     
     address = ""
     #print("personal lines", personal_lines)
-    streets = re.findall('\d{1,4} [\w\s]{1,20}(?:street|st|avenue|ave|road|rd|highway|hwy|square|sq|trail|trl|drive|dr|court|ct|park|parkway|pkwy|circle|cir|boulevard|blvd)\W?(?=\s|$)', personal_lines, re.IGNORECASE)
+    streets = re.findall(r'\d{1,4} [\w\s]{1,20}(?:street|st|avenue|ave|road|rd|highway|hwy|square|sq|trail|trl|drive|dr|court|ct|park|parkway|pkwy|circle|cir|boulevard|blvd)\W?(?=\s|$)', personal_lines, re.IGNORECASE)
     #print("streets", streets)
     if(len(streets) != 0):
         print("street",streets)

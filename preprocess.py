@@ -1,3 +1,4 @@
+from codecs import ignore_errors
 import os
 import re
 from boilerpy3 import extractors
@@ -14,7 +15,9 @@ import io
 from tika import parser
 from process import process_keyword_analysis
 import spacy
-
+import xml.etree.ElementTree as ET
+import xmltodict
+from lxml import etree
 
 scanned_links = []
 
@@ -37,6 +40,37 @@ def parse_pdf(file_path):
     
     return lines
 
+def elem2dict(node):
+    """
+    Convert an lxml.etree node tree into a dict.
+    """
+    result = {}
+
+    for element in node.iterchildren():
+        # Remove namespace prefix
+        # print(element.tag)
+        try:
+            key = element.tag.split('}')[1] if '}' in element.tag else element.tag
+
+            # Process element as tree element if the inner XML contains non-whitespace content
+            if element.text and element.text.strip():
+                value = element.text
+            else:
+                value = elem2dict(element)
+            if key in result:
+
+                
+                if type(result[key]) is list:
+                    result[key].append(value)
+                else:
+                    tempvalue = result[key].copy()
+                    result[key] = [tempvalue, value]
+            else:
+                result[key] = value
+        except:
+            continue
+    return result
+
 # Condenses all repeating newline characters into one single newline character
 def condense_newline(text):
     return ' '.join([p for p in re.split('\n|\r', text) if len(p) > 0])
@@ -47,6 +81,16 @@ def split_newline(text):
 def extract_from_url(url):
     # Make a GET request to fetch the raw HTML content
     html_content = requests.get(url).text
+    # body_start = html_content.index('<body>')
+    # body_end = html_content.index('</body>')
+    parser = etree.XMLParser(recover=True)
+    #print(html_content)
+    tree = ET.fromstring(" ".join(html_content.split()), parser)
+    # for child in tree:
+    #     print(child.tag)
+    tree_dict = elem2dict(tree.getroottree().getroot())
+    #tree = xmltodict.parse('''<div class='logo'><a href='http://alhajj.cpsc.ucalgary.ca'><img src='img/logo.png' alt='' style='height:130px' title='' border='0' /></a></div><div id='menu'><ul><liclass='selected'><a href='index.php'>Home</a></li><li><a href='aboutme.php'>About me</a></li><li><a href='researchinterests.php'>Interests</a></li><li><a href='teaching.php'>Teaching</a></li><li><a href='publications.php'>Publications</a></li><li><a href='collaboration.php'>Collaboration</a></li><li><a href='personal.php'>Personal</a></li><li><a href='students.php'>Students</a></li></ul></div>''')
+    print("html", tree_dict, "\n\n\n")
     clean_text = '\n'.join(BeautifulSoup(html_content, "html.parser").stripped_strings)
     return clean_text
 # Returns the text from a HTML file
@@ -85,10 +129,14 @@ def traverse_web_links(rname, url = None):
     for link in link_tree:
         scanned_content = scan_link(link, 0, rname)
         if(scanned_content):
-            nlp = spacy.load("en_core_web_sm")
-            doc = nlp(scanned_content)
-            sents = [" ".join(x.text.strip().replace("\n"," ").replace("\t", " ").split()) for x in doc.sents if len(x.text) != 0]
-            persons.append(process_keyword_analysis(lines=sents, rname=rname))
+            # nlp = spacy.load("en_core_web_sm")
+            # print("content", scanned_content)
+            # doc = nlp(scanned_content)
+            # sent_temp = [" ".join(x.text.strip().replace("\t", " ").split()) for x in doc.sents if len(x.text) != 0]
+            # sents = []
+            # for sent in sent_temp:
+            #     sents += split_newline(sent)
+            persons.append(process_keyword_analysis(lines=split_newline(scanned_content), rname=rname))
             # cv_content = cv_content + "\n" + scanned_content
     
     # print(link_tree)
