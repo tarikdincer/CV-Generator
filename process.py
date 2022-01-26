@@ -88,8 +88,9 @@ def predict_skills(resume_text, rname):
 def contains_word(s, w):
     return f' {w} ' in f' {s} '
 
-def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "", block_threshold = 3):
-    lines = [line for line in lines if len(line.strip()) != 0]
+def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "", block_threshold = 3, block_index = None, listed_block = None):
+    print("lines", lines)
+    print("scanned_listed_block", listed_block)
     #print("lines", lines)
     resume_text = " ".join(lines)
 
@@ -113,41 +114,55 @@ def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "",
     publications = get_pubs(rname)
     education_starvation = 0
     work_starvation = 0
+    f_1 = open("university_corpus.txt", "r", encoding="utf-8")
+    universities = [x.replace("\n", "").lower() for x in f_1.readlines() if len(x) != 0]
+    f_2 = open("department_corpus.txt", "r", encoding="utf-8")
+    departments = [x.replace("\n", "").lower() for x in f_2.readlines() if len(x) != 0]
+    f_3 = open("degree_corpus.txt", "r", encoding="utf-8")
+    degrees = [x.replace("\n", "").lower() for x in f_3.readlines() if len(x) != 0]
+    f_4 = open("job_corpus.txt", "r", encoding="utf-8")
+    jobs = [x.replace("\n", "").lower() for x in f_4.readlines() if len(x) != 0]
     #c = 0
     slot_lines = []
     personal_lines = ""
     publication_lines = ""
-    for line in lines:
-        lookup_line = line
-        line = re.sub(r'[^\w\s]', '', line).lower()
-        max_slot_conf = 0.0
-        for slot in data:
-            current_conf = 0.0
-            for w in slot["high_conf_keywords"]:
-                if(contains_word(line,w)):
-                    current_conf += 0.3
-            for w in slot["low_conf_keywords"]:
-                if(contains_word(line,w)):
-                    current_conf += 0.1
-            if(current_conf > max_slot_conf + tolerance):
-                current_slot = slot["slot"]
-        slot_lines.append({"slot": current_slot, "line": line})
-    c = 0
-    previous_slot = ""
-    block_index = dict()
-    for index, slot_line in enumerate(slot_lines):
-        if(slot_line["slot"] == previous_slot):
-            c += 1
-        else:
-            c = 0
-        if(c == block_threshold):
-            if previous_slot not in block_index:
-                block_index[previous_slot] = index - block_threshold
-        previous_slot = slot_line["slot"]
+    
+    if(block_index is None):
+        block_index = dict()
+        for line in lines:
+            lookup_line = line
+            line = re.sub(r'[^\w\s]', '', line).lower()
+            max_slot_conf = 0.0
+            for slot in data:
+                current_conf = 0.0
+                for w in slot["high_conf_keywords"]:
+                    if(contains_word(line,w)):
+                        current_conf += 0.3
+                for w in slot["low_conf_keywords"]:
+                    if(contains_word(line,w)):
+                        current_conf += 0.1
+                if(current_conf > max_slot_conf + tolerance):
+                    current_slot = slot["slot"]
+            slot_lines.append({"slot": current_slot, "line": line})
+        c = 0
+        previous_slot = ""
+        
+        for index, slot_line in enumerate(slot_lines):
+            if(slot_line["slot"] == previous_slot):
+                c += 1
+            else:
+                c = 0
+            if(c == block_threshold):
+                if previous_slot not in block_index:
+                    block_index[previous_slot] = index - block_threshold
+            previous_slot = slot_line["slot"]
 
 
     print(block_index)
     for index, line in enumerate(lines):
+        line = line.strip()
+        if len(line) == 0:
+            continue
         #find the slot of line
         
         current_slot = ""
@@ -193,14 +208,7 @@ def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "",
         #         max_slot_conf = current_conf
         
         #keyword corpuses
-        f_1 = open("university_corpus.txt", "r", encoding="utf-8")
-        universities = [x.replace("\n", "").lower() for x in f_1.readlines() if len(x) != 0]
-        f_2 = open("department_corpus.txt", "r", encoding="utf-8")
-        departments = [x.replace("\n", "").lower() for x in f_2.readlines() if len(x) != 0]
-        f_3 = open("degree_corpus.txt", "r", encoding="utf-8")
-        degrees = [x.replace("\n", "").lower() for x in f_3.readlines() if len(x) != 0]
-        f_4 = open("job_corpus.txt", "r", encoding="utf-8")
-        jobs = [x.replace("\n", "").lower() for x in f_4.readlines() if len(x) != 0]
+        
         #find the attributes of line regarding to slot
         
         if(current_slot == "personal"):
@@ -230,30 +238,36 @@ def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "",
                 if("university" in person["education"][-1]):
                     person["education"].append(dict())
                     person["education"][-1]["university"] = unis[0]
+                    education_starvation = 0
                 else:
                     person["education"][-1]["university"] = unis[0]
             
             if(len(degs) != 0):
-                if(len(person["education"]) == 0):
+                if(len(person["education"]) == 0 or education_starvation == starvation):
                     person["education"].append(dict())
+                    education_starvation = 0
                 if("degree" in person["education"][-1]):
                     person["education"].append(dict())
                     person["education"][-1]["degree"] = degs[0]
+                    education_starvation = 0
                 else:
                     person["education"][-1]["degree"] = degs[0]
             
             if(len(deps) != 0):
-                if(len(person["education"]) == 0):
+                if(len(person["education"]) == 0 or education_starvation == starvation):
                     person["education"].append(dict())
+                    education_starvation = 0
                 if("department" in person["education"][-1]):
                     person["education"].append(dict())
                     person["education"][-1]["department"] = deps[0]
+                    education_starvation = 0
                 else:
                     person["education"][-1]["department"] = deps[0]
             
             if(len(years) != 0):
                 if(len(person["education"]) == 0):
                     person["education"].append(dict())
+                    education_starvation = 0
                 person["education"][-1]["end_year"] = years[-1]
                 person["education"][-1]["start_year"] = years[0] if len(years) == 2 else ""
 
@@ -279,30 +293,36 @@ def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "",
                 if("work_place" in person["work"][-1]):
                     person["work"].append(dict())
                     person["work"][-1]["work_place"] = works[0]
+                    work_starvation = 0
                 else:
                     person["work"][-1]["work_place"] = works[0]
             
             if(len(jbs) != 0):
-                if(len(person["work"]) == 0):
+                if(len(person["work"]) == 0 or work_starvation == starvation):
                     person["work"].append(dict())
+                    work_starvation = 0
                 if("job_title" in person["work"][-1]):
                     person["work"].append(dict())
                     person["work"][-1]["job_title"] = jbs[0]
+                    work_starvation = 0
                 else:
                     person["work"][-1]["job_title"] = jbs[0]
             
             if(len(deps) != 0):
-                if(len(person["work"]) == 0):
+                if(len(person["work"]) == 0 or work_starvation == starvation):
                     person["work"].append(dict())
+                    work_starvation = 0
                 if("department" in person["work"][-1]):
                     person["work"].append(dict())
                     person["work"][-1]["department"] = deps[0]
+                    work_starvation = 0
                 else:
                     person["work"][-1]["department"] = deps[0]
             
             if(len(years) != 0 and len(person["work"]) != 0):
                 if(len(person["work"]) == 0):
                     person["work"].append(dict())
+                    work_starvation = 0
                 person["work"][-1]["end_year"] = years[-1]
                 person["work"][-1]["start_year"] = years[0] if len(years) == 2 else ""
             
@@ -311,6 +331,129 @@ def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "",
         
         elif(current_slot == "publication"):
             publication_lines += " " + line.lower()
+
+    if(listed_block is not None):
+        for slot, lines in listed_block.items():
+            for line in lines:
+                line = re.sub(r'[^\w\s]', '', line).lower().strip()
+                if(slot == "research_interests"):
+                    person["skills"].append(line)
+                elif(slot == "personal"):
+                    #print("personal",line)
+                    personal_lines += " " + line
+                    phone_numbers = re.findall(r"(\d{3}[-\.\s]??\d{3}[-\.\s]??\d{4}|\(\d{3}\)\s*\d{3}[-\.\s]??\d{4}|\d{3}[-\.\s]??\d{4})", lookup_line)
+                    if len(phone_numbers) != 0:
+                        person["personal"]["phone"] = phone_numbers[0]
+                    mail_addresses = re.findall(r"[\w\.-]+@[\w\.-]+\.\w+", lookup_line)
+                    if len(mail_addresses) != 0:
+                        person["personal"]["mail"] = mail_addresses[0]
+                    web_sites = re.findall(r'''(?i)\b((?:https?:(?:/{1,3}|[a-z0-9%])|[a-z0-9.\-]+[.](?:com|net|org|edu|gov|mil|aero|asia|biz|cat|coop|info|int|jobs|mobi|museum|name|post|pro|tel|travel|xxx|ac|ad|ae|af|ag|ai|al|am|an|ao|aq|ar|as|at|au|aw|ax|az|ba|bb|bd|be|bf|bg|bh|bi|bj|bm|bn|bo|br|bs|bt|bv|bw|by|bz|ca|cc|cd|cf|cg|ch|ci|ck|cl|cm|cn|co|cr|cs|cu|cv|cx|cy|cz|dd|de|dj|dk|dm|do|dz|ec|ee|eg|eh|er|es|et|eu|fi|fj|fk|fm|fo|fr|ga|gb|gd|ge|gf|gg|gh|gi|gl|gm|gn|gp|gq|gr|gs|gt|gu|gw|gy|hk|hm|hn|hr|ht|hu|id|ie|il|im|in|io|iq|ir|is|it|je|jm|jo|jp|ke|kg|kh|ki|km|kn|kp|kr|kw|ky|kz|la|lb|lc|li|lk|lr|ls|lt|lu|lv|ly|ma|mc|md|me|mg|mh|mk|ml|mm|mn|mo|mp|mq|mr|ms|mt|mu|mv|mw|mx|my|mz|na|nc|ne|nf|ng|ni|nl|no|np|nr|nu|nz|om|pa|pe|pf|pg|ph|pk|pl|pm|pn|pr|ps|pt|pw|py|qa|re|ro|rs|ru|rw|sa|sb|sc|sd|se|sg|sh|si|sj|Ja|sk|sl|sm|sn|so|sr|ss|st|su|sv|sx|sy|sz|tc|td|tf|tg|th|tj|tk|tl|tm|tn|to|tp|tr|tt|tv|tw|tz|ua|ug|uk|us|uy|uz|va|vc|ve|vg|vi|vn|vu|wf|ws|ye|yt|yu|za|zm|zw)/)(?:[^\s()<>{}\[\]]+|\([^\s()]*?\([^\s()]+\)[^\s()]*?\)|\([^\s]+?\))+(?:\([^\s()]*?\([^\s()]+\)[^\s()]*?\)|\([^\s]+?\)|[^\s`!()\[\]{};:'".,<>?«»“”‘’])|(?:(?<!@)[a-z0-9]+(?:[.\-][a-z0-9]+)*[.](?:com|net|org|edu|gov|mil|aero|asia|biz|cat|coop|info|int|jobs|mobi|museum|name|post|pro|tel|travel|xxx|ac|ad|ae|af|ag|ai|al|am|an|ao|aq|ar|as|at|au|aw|ax|az|ba|bb|bd|be|bf|bg|bh|bi|bj|bm|bn|bo|br|bs|bt|bv|bw|by|bz|ca|cc|cd|cf|cg|ch|ci|ck|cl|cm|cn|co|cr|cs|cu|cv|cx|cy|cz|dd|de|dj|dk|dm|do|dz|ec|ee|eg|eh|er|es|et|eu|fi|fj|fk|fm|fo|fr|ga|gb|gd|ge|gf|gg|gh|gi|gl|gm|gn|gp|gq|gr|gs|gt|gu|gw|gy|hk|hm|hn|hr|ht|hu|id|ie|il|im|in|io|iq|ir|is|it|je|jm|jo|jp|ke|kg|kh|ki|km|kn|kp|kr|kw|ky|kz|la|lb|lc|li|lk|lr|ls|lt|lu|lv|ly|ma|mc|md|me|mg|mh|mk|ml|mm|mn|mo|mp|mq|mr|ms|mt|mu|mv|mw|mx|my|mz|na|nc|ne|nf|ng|ni|nl|no|np|nr|nu|nz|om|pa|pe|pf|pg|ph|pk|pl|pm|pn|pr|ps|pt|pw|py|qa|re|ro|rs|ru|rw|sa|sb|sc|sd|se|sg|sh|si|sj|Ja|sk|sl|sm|sn|so|sr|ss|st|su|sv|sx|sy|sz|tc|td|tf|tg|th|tj|tk|tl|tm|tn|to|tp|tr|tt|tv|tw|tz|ua|ug|uk|us|uy|uz|va|vc|ve|vg|vi|vn|vu|wf|ws|ye|yt|yu|za|zm|zw)\b/?(?!@)))''',lookup_line)
+                    if len(web_sites) != 0:
+                        person["personal"]["web_site"] = web_sites[0]
+                elif(slot == "education"):
+                        #print("education",line)
+                        unis =  [re.sub(r'[^\w\s]', '', x) for x in universities if re.sub(r'[^\w\s]', '', x) in line if contains_word(line,re.sub(r'[^\w\s]', '', x))]
+                        deps = [re.sub(r'[^\w\s]', '', x) for x in departments if x in line if contains_word(line,x)]
+                        degs = [re.sub(r'[^\w\s]', '', x) for x in degrees if x in line if contains_word(line,x)]
+                        years = re.findall(r'\b(?:2050|20[0-4][0-9]|19[56789][0-9])\b', line)
+
+                        if(len(unis) != 0):
+                            if(len(person["education"]) == 0 or education_starvation == starvation):
+                                person["education"].append(dict())
+                                education_starvation = 0
+                            if("university" in person["education"][-1]):
+                                person["education"].append(dict())
+                                person["education"][-1]["university"] = unis[0]
+                                education_starvation = 0
+                            else:
+                                person["education"][-1]["university"] = unis[0]
+                        
+                        if(len(degs) != 0):
+                            if(len(person["education"]) == 0 or education_starvation == starvation):
+                                person["education"].append(dict())
+                                education_starvation = 0
+                            if("degree" in person["education"][-1]):
+                                person["education"].append(dict())
+                                person["education"][-1]["degree"] = degs[0]
+                                education_starvation = 0
+                            else:
+                                person["education"][-1]["degree"] = degs[0]
+                        
+                        if(len(deps) != 0):
+                            if(len(person["education"]) == 0 or education_starvation == starvation):
+                                person["education"].append(dict())
+                                education_starvation = 0
+                            if("department" in person["education"][-1]):
+                                person["education"].append(dict())
+                                person["education"][-1]["department"] = deps[0]
+                                education_starvation = 0
+                            else:
+                                person["education"][-1]["department"] = deps[0]
+                        
+                        if(len(years) != 0):
+                            if(len(person["education"]) == 0):
+                                person["education"].append(dict())
+                                education_starvation = 0
+                            person["education"][-1]["end_year"] = years[-1]
+                            person["education"][-1]["start_year"] = years[0] if len(years) == 2 else ""
+
+                        if(len(unis) == 0 and len(deps) == 0 and len(degs) == 0 and len(years) == 0):
+                            education_starvation += 1
+                elif(slot == "work"):
+                    #print("work",line)
+                    work_companies = re.findall(r"\b[A-Z]\w+(?:\.com?)?(?:[ -]+(?:&[ -]+)?[A-Z]\w+(?:\.com?)?){0,2}[,\s]+(?i:ltd|llc|inc|plc|co(?:rp)?|group|holding|gmbh)\b", line)
+                    work_unis =  [re.sub(r'[^\w\s]', '', x) for x in universities if re.sub(r'[^\w\s]', '', x) in line if contains_word(line,re.sub(r'[^\w\s]', '', x))]
+                    deps = [re.sub(r'[^\w\s]', '', x) for x in departments if x in line if contains_word(line,x)]
+                    jbs =  [re.sub(r'[^\w\s]', '', x) for x in sorted(jobs, key=len, reverse=True) if x in line if contains_word(line,x)]
+                    years = re.findall(r'\b(?:2050|20[0-4][0-9]|19[56789][0-9])\b', line)
+                    works = work_companies + work_unis
+
+                    if(len(works) != 0):
+                        if(len(person["work"]) == 0 or work_starvation == starvation):
+                            person["work"].append(dict())
+                            work_starvation = 0
+                        if("work_place" in person["work"][-1]):
+                            person["work"].append(dict())
+                            person["work"][-1]["work_place"] = works[0]
+                            work_starvation = 0
+                        else:
+                            person["work"][-1]["work_place"] = works[0]
+                    
+                    if(len(jbs) != 0):
+                        if(len(person["work"]) == 0 or work_starvation == starvation):
+                            person["work"].append(dict())
+                            work_starvation = 0
+                        if("job_title" in person["work"][-1]):
+                            person["work"].append(dict())
+                            person["work"][-1]["job_title"] = jbs[0]
+                            work_starvation = 0
+                        else:
+                            person["work"][-1]["job_title"] = jbs[0]
+                    
+                    if(len(deps) != 0):
+                        if(len(person["work"]) == 0 or work_starvation == starvation):
+                            person["work"].append(dict())
+                            work_starvation = 0
+                        if("department" in person["work"][-1]):
+                            person["work"].append(dict())
+                            person["work"][-1]["department"] = deps[0]
+                            work_starvation = 0
+                        else:
+                            person["work"][-1]["department"] = deps[0]
+                    
+                    if(len(years) != 0 and len(person["work"]) != 0):
+                        if(len(person["work"]) == 0):
+                            person["work"].append(dict())
+                            work_starvation = 0
+                        person["work"][-1]["end_year"] = years[-1]
+                        person["work"][-1]["start_year"] = years[0] if len(years) == 2 else ""
+                    
+                    if(len(works) == 0 and len(jbs) == 0 and len(years) == 0):
+                        work_starvation += 1
+        
+                elif(slot == "publication"):
+                    publication_lines += " " + line.lower()
+
 
     #print("pub lines", publication_lines)
     #print(publications)

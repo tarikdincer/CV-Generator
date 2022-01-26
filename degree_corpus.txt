@@ -38,3 +38,4 @@ LLM
 Masters of Law
 PhD
 Doctor of Philosophy
+B Tech
