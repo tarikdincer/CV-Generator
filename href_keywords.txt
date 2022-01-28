@@ -1,0 +1,10 @@
+contact
+cv
+bio
+biography
+teaching
+courses
+info
+people
+publication
+award

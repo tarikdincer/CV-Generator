@@ -70,13 +70,13 @@ def get_blocks_helper(node, blocks, listed_blocks, slots):
         is_slot_found = False
         if(len(headers) > 0):
             for header in headers:
-                print(header.tag,':', header.text)
+                #print(header.tag,':', header.text)
                 title = header.text
                 if title == None or title.strip() == '':
                   title = ''
                   for text in header.itertext(with_tail=True):
                     title += text
-                  print('hader content: ',title)
+                  #print('hader content: ',title)
                 if(header.tag == 'b' and len(title.split()) > 3):
                   continue
                 assigned_slot = ''
@@ -117,7 +117,7 @@ def get_blocks_helper(node, blocks, listed_blocks, slots):
                                   if assigned_slot not in blocks:
                                       blocks[assigned_slot] = ""
                                   if content not in blocks[assigned_slot]:
-                                    print('content added: ', content, '\n')
+                                    #print('content added: ', content, '\n')
                                     blocks[assigned_slot] += "\n" + content
                               current_tag = next_tag.tag
                               next_tag = next_tag.getnext()
@@ -155,7 +155,7 @@ def extract_from_url(url):
     blocks,listed_blocks = get_blocks(tree)
     print("url", url)
     print("listed block", listed_blocks)
-    return html_content, blocks, listed_blocks
+    return blocks, listed_blocks
     
 
 
@@ -252,7 +252,7 @@ def traverse_web_links(rname, url=None):
     persons = []
 
     for link in link_tree:
-        scanned_block, scanned_listed_block = scan_link(link, 0, rname)
+        scanned_block, scanned_listed_block, scanned_content = scan_link(link, 1, rname)
         #print(scanned_block)
         lines = []
         block_index = None
@@ -267,8 +267,7 @@ def traverse_web_links(rname, url=None):
             #     sents += split_newline(sent)
         persons.append(process_keyword_analysis(
             lines=lines, rname=rname, block_index=block_index, listed_block = scanned_listed_block))
-            # persons.append(process_keyword_analysis(
-            # lines=lines, rname=rname))
+        persons.append(process_keyword_analysis(lines=scanned_content.splitlines(), rname=rname))
 
     # print(link_tree)
     # print("content: " + cv_content)
@@ -277,7 +276,7 @@ def traverse_web_links(rname, url=None):
 
 def scan_link(link, counter=1, rname=""):
     if link in scanned_links:
-        return dict(), dict()
+        return dict(), dict(), ""
     scanned_links.append(link)
     #print("cv_content", cv_content)
     block = dict()
@@ -285,8 +284,8 @@ def scan_link(link, counter=1, rname=""):
     content = ""
     try:
         print(link)
-        #content = parse_html(link)
-        content, block, listed_blocks = extract_from_url(link)
+        content = "\n".join(parse_html(link))
+        block, listed_blocks = extract_from_url(link)
 
         # print(content)
     except Exception as e:
@@ -295,20 +294,27 @@ def scan_link(link, counter=1, rname=""):
         pass
     #print("rname", rname)
     #print("content", content)
-    if rname.lower() not in content:
+    if rname.lower() not in content.lower():
         content = ""
 
     if counter != 0:
         page = requests.get(link)
         data = page.text
         soup = BeautifulSoup(data)
-
+        f = open("href_keywords.txt", "r")
+        href_keys = f.readlines()
         for l in soup.find_all('a'):
+            print("href")
             new_link = urllib.parse.urljoin(link, l.get('href'))
-            block = dict(list(block.items()) + list(scan_link(new_link, counter - 1, rname)[0].items()))
-            listed_blocks = dict(list(listed_blocks.items()) + list(scan_link(new_link, counter - 1, rname)[1].items()))
-
-    return block, listed_blocks
+            if(not(any(True for x in href_keys if x in new_link))):
+                continue
+            print("new link", new_link)
+            b, lb, c= scan_link(new_link, counter - 1, rname)
+            block = dict(list(block.items()) + list(b.items()))
+            listed_blocks = dict(list(listed_blocks.items()) + list(lb.items()))
+            content += "\n" + c
+    print("aaa", block, listed_blocks, content)  
+    return block, listed_blocks, content
 
 # def scan_link(link, counter=1, rname=""):
 #     if link in scanned_links:

@@ -111,6 +111,8 @@ def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "",
     person["work"] = []
     person["publications"] = []
     person["skills"] = skills
+    person["awards"] = []
+    person["services"] = []
     publications = get_pubs(rname)
     education_starvation = 0
     work_starvation = 0
@@ -450,6 +452,11 @@ def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "",
                     
                     if(len(works) == 0 and len(jbs) == 0 and len(years) == 0):
                         work_starvation += 1
+                elif(slot == "award"):
+                    person["awards"].append(line)
+                
+                elif(slot == "service"):
+                    person["services"].append(line)
         
                 elif(slot == "publication"):
                     publication_lines += " " + line.lower()
@@ -517,6 +524,8 @@ def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "",
     pruned_person["work"] = []
     pruned_person["publications"] = person["publications"]
     pruned_person["skills"] = skills
+    pruned_person["awards"] = person["awards"]
+    pruned_person["services"] = person["services"]
 
     for education in person["education"]:
         if("degree" in education and ("university" in education or "department" in education)):

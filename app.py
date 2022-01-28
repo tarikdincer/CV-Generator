@@ -266,6 +266,18 @@ def select_people():
             skill_html += f'''<div>
             <p> {skill} </p>
             </div>'''
+        
+        award_html = "<h3> Awards </h3>"
+        for award in person["awards"]:
+            award_html += f'''<div>
+            <p> {award} </p>
+            </div>'''
+        
+        service_html = "<h3> Services </h3>"
+        for service in person["services"]:
+            service_html += f'''<div>
+            <p> {service} </p>
+            </div>'''
 
         pub_html = "<h3> Publications </h3>"
         for pub in person["publications"]:
@@ -279,6 +291,8 @@ def select_people():
             {work_html}
             {pub_html}
             {skill_html}
+            {award_html}
+            {service_html}
         </div>
         '''
     return f"""
