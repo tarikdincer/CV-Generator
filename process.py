@@ -106,6 +106,10 @@ def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "",
     person = dict()
     person["personal"] = dict()
     person["personal"]["name"] = rname
+    person["personal"]["phone"] = ""
+    person["personal"]["mail"] = ""
+    person["personal"]["address"] = ""
+    person["personal"]["web_site"] = ""
     person["personal"]["address"] = addresses[0] if len(addresses) != 0 else ""
     person["education"] = []
     person["work"] = []
@@ -113,6 +117,7 @@ def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "",
     person["skills"] = skills
     person["awards"] = []
     person["services"] = []
+    person["courses"] = []
     publications = get_pubs(rname)
     education_starvation = 0
     work_starvation = 0
@@ -212,6 +217,7 @@ def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "",
         #keyword corpuses
         
         #find the attributes of line regarding to slot
+        
         
         if(current_slot == "personal"):
             #print("personal",line)
@@ -457,6 +463,9 @@ def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "",
                 
                 elif(slot == "service"):
                     person["services"].append(line)
+                
+                elif(slot == "courses"):
+                    person["courses"].append(line)
         
                 elif(slot == "publication"):
                     publication_lines += " " + line.lower()
@@ -526,6 +535,7 @@ def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "",
     pruned_person["skills"] = skills
     pruned_person["awards"] = person["awards"]
     pruned_person["services"] = person["services"]
+    pruned_person["courses"] = person["courses"]
 
     for education in person["education"]:
         if("degree" in education and ("university" in education or "department" in education)):

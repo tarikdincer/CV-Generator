@@ -218,7 +218,7 @@ def select_people():
         <table> 
             <tr> 
                 <th> Name Surname: </th> 
-                <td> {person["personal"]["name"] if "name" in person["personal"] else ""} </td> 
+                <td> {person["personal"]["name"].title() if "name" in person["personal"] else ""} </td> 
             </tr>
             <tr> 
                 <th> Phone: </th> 
@@ -234,7 +234,7 @@ def select_people():
             </tr>
             <tr> 
                 <th> Address: </th> 
-                <td> {person["personal"]["address"] if "address" in person["personal"] else ""} </td> 
+                <td> {person["personal"]["address"].title() if "address" in person["personal"] else ""} </td> 
             </tr>
         </table>'''
         
@@ -243,9 +243,9 @@ def select_people():
         for education in person["education"]:
             education_html += f'''
             <tr>
-                <td> {education["degree"] if "degree" in education else ""} </td>
-                <td> {education["department"] if "department" in education else ""} </td>
-                <td> {education["university"] if "university" in education else ""} </td>
+                <td> {education["degree"].title() if "degree" in education else ""} </td>
+                <td> {education["department"].title() if "department" in education else ""} </td>
+                <td> {education["university"].title() if "university" in education else ""} </td>
                 <td> {education["start_year"] if "start_year" in education else ""} - {education["end_year"] if "end_year" in education else ""} </td>
             </tr>'''
         education_html += "</table>"
@@ -254,9 +254,9 @@ def select_people():
         for work in person["work"]:
             work_html += f'''
             <tr>
-                <td> {work["job_title"] if "job_title" in work else ""} </td>
-                <td> {work["department"] if "department" in work else ""} </td>
-                <td> {work["work_place"] if "work_place" in work else ""} </td>
+                <td> {work["job_title"].title() if "job_title" in work else ""} </td>
+                <td> {work["department"].title() if "department" in work else ""} </td>
+                <td> {work["work_place"].title() if "work_place" in work else ""} </td>
                 <td> {work["start_year"] if "start_year" in work else ""} - {work["end_year"] if "end_year" in work else ""} </td>
             </tr>'''
         work_html += "</table>"
@@ -264,25 +264,31 @@ def select_people():
         skill_html = "<h3> Skills </h3>"
         for skill in person["skills"]:
             skill_html += f'''<div>
-            <p> {skill} </p>
+            <p> {skill.title()} </p>
             </div>'''
         
         award_html = "<h3> Awards </h3>"
         for award in person["awards"]:
             award_html += f'''<div>
-            <p> {award} </p>
+            <p> {award.title()} </p>
             </div>'''
         
         service_html = "<h3> Services </h3>"
         for service in person["services"]:
             service_html += f'''<div>
-            <p> {service} </p>
+            <p> {service.title()} </p>
+            </div>'''
+        
+        course_html = "<h3> Courses </h3>"
+        for course in person["courses"]:
+            course_html += f'''<div>
+            <p> {course.title()} </p>
             </div>'''
 
         pub_html = "<h3> Publications </h3>"
         for pub in person["publications"]:
             pub_html += f'''<div>
-            <p> {pub["title"]} , {pub["year"]}</p>
+            <p> {pub["title"].title()} , {pub["year"]}</p>
             </div>'''
 
         people_contents += f'''<div class="m-5 tab-pane fade {isActive}" id="p{i}" role="tabpanel" aria-labelledby="p{i}-tab">
@@ -293,6 +299,7 @@ def select_people():
             {skill_html}
             {award_html}
             {service_html}
+            {course_html}
         </div>
         '''
     return f"""

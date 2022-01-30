@@ -223,6 +223,39 @@ def parse_html(html_path):
     html_extractor = extractors.KeepEverythingExtractor()
     return split_newline(html_extractor.get_content_from_url(html_path))
 
+def combine_persons(person_1, person_2):
+    combined_person = dict()
+    combined_person["personal"] = dict()
+    combined_person["education"] = []
+    combined_person["work"] = []
+    combined_person["publications"] = []
+    combined_person["skills"] = []
+    combined_person["awards"] = []
+    combined_person["services"] = []
+    combined_person["courses"] = []
+    combined_person["personal"]["name"] = person_1["personal"]["name"]
+    combined_person["personal"]["mail"] = person_1["personal"]["mail"] + "" if person_1["personal"]["mail"] == "" or person_2["personal"]["mail"] == "" else "," + person_2["personal"]["mail"]
+    combined_person["personal"]["phone"] = person_1["personal"]["phone"] + "" if person_1["personal"]["phone"] == "" or person_2["personal"]["phone"] == "" else "," + person_2["personal"]["phone"]
+    combined_person["personal"]["web_site"] = person_1["personal"]["web_site"] + "" if person_1["personal"]["web_site"] == "" or person_2["personal"]["web_site"] == "" else "," + person_2["personal"]["web_site"]
+    combined_person["personal"]["address"] = person_1["personal"]["address"] + "" if person_1["personal"]["address"] == "" or person_2["personal"]["address"] == "" else "," + person_2["personal"]["address"]
+
+    for education in (person_1["education"] + person_2["education"]) :
+        if(not(any(True for x in combined_person["education"] if x["degree"] == education["degree"]))):
+            combined_person["education"].append(education)
+    
+    for work in (person_1["work"] + person_2["work"]):
+        if(not(any(True for x in combined_person["work"] if x["work_place"] == work["work_place"] and x["job_title"] == work["job_title"]))):
+            combined_person["work"].append(work)
+    
+    combined_person["skills"] = list(set(person_1["skills"] + person_2["skills"]))
+    combined_person["awards"] = list(set(person_1["awards"] + person_2["awards"]))
+    combined_person["services"] = list(set(person_1["services"] + person_2["services"]))
+    combined_person["courses"] = list(set(person_1["courses"] + person_2["courses"]))
+
+    combined_person["publications"] = person_1["publications"] if len(person_1["publications"]) != 0 else person_2["publications"]
+
+    return combined_person
+
 
 def traverse_web_links(rname, url=None):
     cv_content = ""
@@ -265,9 +298,10 @@ def traverse_web_links(rname, url=None):
             # sents = []
             # for sent in sent_temp:
             #     sents += split_newline(sent)
-        persons.append(process_keyword_analysis(
-            lines=lines, rname=rname, block_index=block_index, listed_block = scanned_listed_block))
-        persons.append(process_keyword_analysis(lines=scanned_content.splitlines(), rname=rname))
+        person_1 = process_keyword_analysis(
+            lines=lines, rname=rname, block_index=block_index, listed_block = scanned_listed_block)
+        person_2 = process_keyword_analysis(lines=scanned_content.splitlines(), rname=rname)
+        persons.append(combine_persons(person_1,person_2))
 
     # print(link_tree)
     # print("content: " + cv_content)
@@ -303,17 +337,23 @@ def scan_link(link, counter=1, rname=""):
         soup = BeautifulSoup(data)
         f = open("href_keywords.txt", "r")
         href_keys = f.readlines()
+        href_keys = [x.replace('\n','') for x in href_keys]
+        counter = 0
         for l in soup.find_all('a'):
-            print("href")
+            #print("href")
             new_link = urllib.parse.urljoin(link, l.get('href'))
-            if(not(any(True for x in href_keys if x in new_link))):
+            # print("href keys", href_keys)
+            #print("new link", new_link)
+            if(not(any(True for x in href_keys if x.lower() in new_link.lower())) or counter > 10):
+                #print("not link",new_link)
                 continue
-            print("new link", new_link)
+            counter += 1
+            #print("yes link",new_link)
             b, lb, c= scan_link(new_link, counter - 1, rname)
             block = dict(list(block.items()) + list(b.items()))
             listed_blocks = dict(list(listed_blocks.items()) + list(lb.items()))
             content += "\n" + c
-    print("aaa", block, listed_blocks, content)  
+    #print("aaa", block, listed_blocks, content)  
     return block, listed_blocks, content
 
 # def scan_link(link, counter=1, rname=""):
