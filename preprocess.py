@@ -19,9 +19,17 @@ import xml.etree.ElementTree as ET
 import xmltodict
 from lxml import etree
 import json
+from urllib.parse import urlparse
+import urllib.request
 
 scanned_links = []
 
+def download_file(download_url, filename):
+    print("pdf downloading: ", download_url)
+    response = urllib.request.urlopen(download_url)    
+    file = open(filename, "wb")
+    file.write(response.read())
+    file.close()
 
 def parse_pdf_tika(filename):
     file_data = parser.from_file(filename)
@@ -223,6 +231,31 @@ def parse_html(html_path):
     html_extractor = extractors.KeepEverythingExtractor()
     return split_newline(html_extractor.get_content_from_url(html_path))
 
+def check_if_same(p1,p2):
+    similarity_score = 100
+    if (not (p1["personal"]["mail"] in p2["personal"]["mail"] or p2["personal"]["mail"] in p1["personal"]["mail"])):
+        similarity_score -= 20
+    if (not (p1["personal"]["phone"] in p2["personal"]["phone"] or p2["personal"]["phone"] in p1["personal"]["phone"])):
+        similarity_score -= 20
+    if (not (p1["personal"]["web_site"] in p2["personal"]["web_site"] or p2["personal"]["web_site"] in p1["personal"]["web_site"])):
+        similarity_score -= 20
+
+    for p1_education in p1["education"]:
+        for p2_education in p2["education"]:
+            if((p1_education["degree"] == p2_education["degree"] and not(p1_education["university"] == p2_education["university"]))):
+                similarity_score -= 10
+            if("end_year" in p1_education and "end_year" in p2_education and p1_education["end_year"] == p2_education["end_year"] and not(p1_education["university"] == p2_education["university"])):
+                similarity_score -= 10
+
+    for p1_work in p1["work"]:
+        for p2_work in p2["work"]:
+            if((p1_work["work_place"] == p2_work["work_place"] and not(p1_work["job_title"] == p2_work["job_title"]))):
+                similarity_score -= 10
+            if("end_year" in p1_work and "end_year" in p2_work and p1_education["end_year"] == p2_education["end_year"] and not(p1_education["work_place"] == p2_education["work_place"])):
+                similarity_score -= 10
+
+    return similarity_score > 50
+
 def combine_persons(person_1, person_2):
     combined_person = dict()
     combined_person["personal"] = dict()
@@ -234,10 +267,10 @@ def combine_persons(person_1, person_2):
     combined_person["services"] = []
     combined_person["courses"] = []
     combined_person["personal"]["name"] = person_1["personal"]["name"]
-    combined_person["personal"]["mail"] = person_1["personal"]["mail"] + "" if person_1["personal"]["mail"] == "" or person_2["personal"]["mail"] == "" else "," + person_2["personal"]["mail"]
-    combined_person["personal"]["phone"] = person_1["personal"]["phone"] + "" if person_1["personal"]["phone"] == "" or person_2["personal"]["phone"] == "" else "," + person_2["personal"]["phone"]
-    combined_person["personal"]["web_site"] = person_1["personal"]["web_site"] + "" if person_1["personal"]["web_site"] == "" or person_2["personal"]["web_site"] == "" else "," + person_2["personal"]["web_site"]
-    combined_person["personal"]["address"] = person_1["personal"]["address"] + "" if person_1["personal"]["address"] == "" or person_2["personal"]["address"] == "" else "," + person_2["personal"]["address"]
+    combined_person["personal"]["mail"] = person_1["personal"]["mail"] + ("" if (person_1["personal"]["mail"] == "" or person_2["personal"]["mail"] == "") else ", ") + person_2["personal"]["mail"]
+    combined_person["personal"]["phone"] = person_1["personal"]["phone"] + ("" if (person_1["personal"]["phone"] == "" or person_2["personal"]["phone"] == "") else ", ") + person_2["personal"]["phone"]
+    combined_person["personal"]["web_site"] = person_1["personal"]["web_site"] + ("" if person_1["personal"]["web_site"] == "" or person_2["personal"]["web_site"] == "" else ", ") + person_2["personal"]["web_site"]
+    combined_person["personal"]["address"] = person_1["personal"]["address"] + ("" if (person_1["personal"]["address"] == "" or person_2["personal"]["address"] == "") else ", ") + person_2["personal"]["address"]
 
     for education in (person_1["education"] + person_2["education"]) :
         if(not(any(True for x in combined_person["education"] if x["degree"] == education["degree"]))):
@@ -285,7 +318,8 @@ def traverse_web_links(rname, url=None):
     persons = []
 
     for link in link_tree:
-        scanned_block, scanned_listed_block, scanned_content = scan_link(link, 1, rname)
+        scanned_block, scanned_listed_block, scanned_content, pdfs = scan_link(link, 1, rname)
+        print("pdfs cumulative: ", pdfs)
         #print(scanned_block)
         lines = []
         block_index = None
@@ -301,7 +335,16 @@ def traverse_web_links(rname, url=None):
         person_1 = process_keyword_analysis(
             lines=lines, rname=rname, block_index=block_index, listed_block = scanned_listed_block)
         person_2 = process_keyword_analysis(lines=scanned_content.splitlines(), rname=rname)
-        persons.append(combine_persons(person_1,person_2))
+        person_3 = process_keyword_analysis(lines=scanned_content.splitlines(), rname=rname, line_by_line=True)
+        person_temp = combine_persons(combine_persons(person_1,person_2), person_3)
+        for i,pdf in enumerate(pdfs):
+            filename = rname + "_" + str(i) + ".pdf"
+            download_file(pdf, filename)
+            content = parse_pdf_tika(filename).splitlines()
+            pdf_person = process_keyword_analysis(content, rname=rname)
+            person_temp = combine_persons(person_temp, pdf_person)
+            
+        persons.append(person_temp)
 
     # print(link_tree)
     # print("content: " + cv_content)
@@ -310,16 +353,21 @@ def traverse_web_links(rname, url=None):
 
 def scan_link(link, counter=1, rname=""):
     if link in scanned_links:
-        return dict(), dict(), ""
+        return dict(), dict(), "", []
     scanned_links.append(link)
     #print("cv_content", cv_content)
     block = dict()
     listed_blocks = dict()
     content = ""
+    pdfs = []
     try:
-        print(link)
-        content = "\n".join(parse_html(link))
-        block, listed_blocks = extract_from_url(link)
+        if(".pdf" in link):
+            pdfs.append(link)
+            print("pdf found: ", link)
+        else:
+            print(link)
+            content = "\n".join(parse_html(link))
+            block, listed_blocks = extract_from_url(link)
 
         # print(content)
     except Exception as e:
@@ -335,26 +383,33 @@ def scan_link(link, counter=1, rname=""):
         page = requests.get(link)
         data = page.text
         soup = BeautifulSoup(data)
-        f = open("href_keywords.txt", "r")
-        href_keys = f.readlines()
-        href_keys = [x.replace('\n','') for x in href_keys]
-        counter = 0
+        # f = open("href_keywords.txt", "r")
+        # href_keys = f.readlines()
+        # href_keys = [x.replace('\n','') for x in href_keys]
+        root_url = urlparse(link).netloc
+        index = 0
         for l in soup.find_all('a'):
             #print("href")
             new_link = urllib.parse.urljoin(link, l.get('href'))
-            # print("href keys", href_keys)
-            #print("new link", new_link)
-            if(not(any(True for x in href_keys if x.lower() in new_link.lower())) or counter > 10):
-                #print("not link",new_link)
+            new_link_root = urlparse(new_link).netloc
+            if(index > 10):
+                break
+            if(new_link_root != root_url):
                 continue
-            counter += 1
+            # print("href keys", href_keys)
+            print("new link", new_link)
+            # if(not(any(True for x in href_keys if x.lower() in new_link.lower())) or counter > 10):
+            #     #print("not link",new_link)
+            #     continue
+            index += 1
             #print("yes link",new_link)
-            b, lb, c= scan_link(new_link, counter - 1, rname)
+            b, lb, c, p= scan_link(new_link, counter - 1, rname)
+            pdfs += p
             block = dict(list(block.items()) + list(b.items()))
             listed_blocks = dict(list(listed_blocks.items()) + list(lb.items()))
             content += "\n" + c
     #print("aaa", block, listed_blocks, content)  
-    return block, listed_blocks, content
+    return block, listed_blocks, content, pdfs
 
 # def scan_link(link, counter=1, rname=""):
 #     if link in scanned_links:

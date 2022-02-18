@@ -88,7 +88,7 @@ def predict_skills(resume_text, rname):
 def contains_word(s, w):
     return f' {w} ' in f' {s} '
 
-def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "", block_threshold = 3, block_index = None, listed_block = None):
+def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "", block_threshold = 3, block_index = None, listed_block = None, line_by_line = False):
     print("lines", lines)
     print("scanned_listed_block", listed_block)
     #print("lines", lines)
@@ -173,7 +173,7 @@ def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "",
         #find the slot of line
         
         current_slot = ""
-        if(len(block_index) > 0):
+        if(len(block_index) > 0 and line_by_line == False):
             try:
                 for slot, i in block_index.items():
                     if i <= index:
@@ -278,6 +278,11 @@ def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "",
                     education_starvation = 0
                 person["education"][-1]["end_year"] = years[-1]
                 person["education"][-1]["start_year"] = years[0] if len(years) == 2 else ""
+                if(person["education"][-1]["end_year"] < person["education"][-1]["start_year"]):
+                    start_year = person["education"][-1]["end_year"]
+                    end_year = person["education"][-1]["start_year"]
+                    person["education"][-1]["start_year"] = start_year
+                    person["education"][-1]["end_year"] = end_year
 
             if(len(unis) == 0 and len(deps) == 0 and len(degs) == 0 and len(years) == 0):
                 education_starvation += 1
@@ -333,6 +338,11 @@ def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "",
                     work_starvation = 0
                 person["work"][-1]["end_year"] = years[-1]
                 person["work"][-1]["start_year"] = years[0] if len(years) == 2 else ""
+                if(person["work"][-1]["end_year"] < person["work"][-1]["start_year"]):
+                    start_year = person["work"][-1]["end_year"]
+                    end_year = person["work"][-1]["start_year"]
+                    person["work"][-1]["start_year"] = start_year
+                    person["work"][-1]["end_year"] = end_year
             
             if(len(works) == 0 and len(jbs) == 0 and len(years) == 0):
                 work_starvation += 1
@@ -404,6 +414,11 @@ def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "",
                                 education_starvation = 0
                             person["education"][-1]["end_year"] = years[-1]
                             person["education"][-1]["start_year"] = years[0] if len(years) == 2 else ""
+                            if(person["education"][-1]["end_year"] < person["education"][-1]["start_year"]):
+                                start_year = person["education"][-1]["end_year"]
+                                end_year = person["education"][-1]["start_year"]
+                                person["education"][-1]["start_year"] = start_year
+                                person["education"][-1]["end_year"] = end_year
 
                         if(len(unis) == 0 and len(deps) == 0 and len(degs) == 0 and len(years) == 0):
                             education_starvation += 1
@@ -455,6 +470,11 @@ def process_keyword_analysis(lines, tolerance = 0.2, starvation = 2, rname = "",
                             work_starvation = 0
                         person["work"][-1]["end_year"] = years[-1]
                         person["work"][-1]["start_year"] = years[0] if len(years) == 2 else ""
+                        if(person["work"][-1]["end_year"] < person["work"][-1]["start_year"]):
+                            start_year = person["work"][-1]["end_year"]
+                            end_year = person["work"][-1]["start_year"]
+                            person["work"][-1]["start_year"] = start_year
+                            person["work"][-1]["end_year"] = end_year
                     
                     if(len(works) == 0 and len(jbs) == 0 and len(years) == 0):
                         work_starvation += 1
@@ -707,105 +727,3 @@ def selectWork(researcherid):
     return rows
 
 
-def check_if_same(p1,p2):
-    similarity_score = 100
-    if ("mail" in p1["personal"] and "mail" in p2["personal"] and p1["personal"]["mail"] == p2["personal"]["mail"]):
-        similarity_score -= 20
-    if ("phone" in p1["personal"] and "phone" in p2["personal"] and p1["personal"]["phone"] == p2["personal"]["phone"]):
-        similarity_score -= 20
-    if ("web_site" in p1["personal"] and "web_site" in p2["personal"] and p1["personal"]["web_site"] == p2["personal"]["web_site"]):
-        similarity_score -= 20
-
-    if ("education" in p1 and "education" in p2):
-        if (len(p1["education"]) < len(p2["education"])):
-            for education1 in p1["education"]:
-                if(education1["university"] not in [education2["university"] for education2 in p2["education"]]):
-                    similarity_score -= 10
-        else:
-            for education2 in p2["education"]:
-                if(education2["university"] not in [education1["university"] for education1 in p1["education"]]):
-                    similarity_score -= 10
-
-    if ("work" in p1 and "work" in p2):
-        if (len(p1["work"]) < len(p2["work"])):
-            for work1 in p1["work"]:
-                if(work1["work_place"] not in [work2["work_place"] for work2 in p2["work"]]):
-                    similarity_score -= 10
-        else:
-            for work2 in p2["work"]:
-                if(work2["work_place"] not in [work1["work_place"] for work1 in p1["work"]]):
-                    similarity_score -= 10
-
-    if ("skills" in p1 and "skills" in p2):
-        if (len(p1["skills"]) < len(p2["skills"])):
-            for skill1 in p1["skills"]:
-                if(skill1 not in p2["skills"]):
-                    similarity_score -= 10
-        else:
-            for skill2 in p2["skills"]:
-                if(skill2 not in p1["skills"]):
-                    similarity_score -= 10
-
-    if (similarity_score > 50):
-        return True
-    return False
-
-
-def get_different_people(people):
-    isExitTime = False
-    people_dict = dict()
-
-    while isExitTime == False:
-        isExitTime, people_dict = combine_people(people)
-
-    return people_dict
-
-def combine_people(people):
-    isCompleted = True
-    for i, p1 in enumerate(people):
-        for j, p2 in enumerate(people):
-            if (i != j and check_if_same(p1,p2)):
-                if ("mail" in p2["personal"]):
-                    p1["personal"]["mail"] = p2["personal"]["mail"]
-                if ("phone" in p2["personal"]):
-                    p1["personal"]["phone"] = p2["personal"]["phone"]
-                if ("web_site" in p2["personal"]):
-                    p1["personal"]["web_site"] = p2["personal"]["web_site"]
-
-                if ("education" in p1 and "education" in p2):
-                        for education2 in p2["education"]:
-                            isExist = False
-                            for i, education1 in enumerate(p1["education"]):
-                                if(education2["university"] == education1["university"] and education2["degree"] == education1["degree"]):
-                                    if("start_year" in education2):
-                                        p1["education"][i]["start_year"] = education2["start_year"]
-                                    if("end_year" in education2):
-                                        p1["education"][i]["end_year"] = education2["end_year"]
-                                    isExist = True
-                                    break
-                            if(not isExist):
-                                p1["education"].append(education2)
-                                
-                if ("work" in p1 and "work" in p2):
-                        for work2 in p2["work"]:
-                            isExist = False
-                            for i, work1 in enumerate(p1["work"]):
-                                if(work2["work_place"] == work1["work_place"] and work2["degree"] == work1["degree"]):
-                                    if("start_year" in work2):
-                                        p1["work"][i]["start_year"] = work2["start_year"]
-                                    if("end_year" in work2):
-                                        p1["work"][i]["end_year"] = work2["end_year"]
-                                    isExist = True
-                                    break
-                            if(not isExist):
-                                p1["work"].append(work2)
-
-                if ("skill" in p1 and "skill" in p2):
-                        for skill2 in p2["skill"]:
-                            isExist = False
-                            if (skill2 not in p1["skills"]):
-                                p1["skills"].append(skill2)
-
-            people.remove(j)
-            isCompleted = False
-    return isCompleted, people
