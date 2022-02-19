@@ -542,6 +542,6 @@ def create_pdf_from_person(person):
         for x in person["services"]:
             pdf.cell(0, 8, txt="•" + x, ln=1, align='L')
 
-    file_path = person["personal"]["name"] + " " + datetime.datetime.now() + ".pdf"
+    file_path = "created_cvs/" + person["personal"]["name"] + " " + datetime.datetime.now() + ".pdf"
     pdf.output(file_path)
     return file_path
