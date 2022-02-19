@@ -2,8 +2,8 @@ from flask import Flask, jsonify, request, render_template, url_for, redirect, s
 from flask_session import Session
 from server.utils import preprocess_data, predict, idx2tag
 from werkzeug.utils import secure_filename
-from werkzeug.datastructures import  FileStorage
-from preprocess import create_pdf_from_person, get_combined_people_list, traverse_web_links,parse_pdf_tika,split_newline
+from werkzeug.datastructures import FileStorage
+from preprocess import create_pdf_from_person, get_combined_people_list, traverse_web_links, parse_pdf_tika, split_newline
 import textract
 from pdfminer.high_level import extract_text
 from scholarly import scholarly
@@ -20,16 +20,16 @@ app.config['JSON_SORT_KEYS'] = False
 UPLOAD_FOLDER = '/uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-    # search_query = scholarly.search_pubs(rname)
-    # publication = next(search_query, None)
-    # counter = 0
+# search_query = scholarly.search_pubs(rname)
+# publication = next(search_query, None)
+# counter = 0
 
-    # while publication is not None and counter < 5:
-    #     publication = next(search_query, None)
-    #     #print(publication)
-    #     pid = insertPublication(ptitle = publication["bib"]["title"], pyear = publication["bib"]["pub_year"], venue = publication["bib"]["venue"], scholarurl = publication["pub_url"], bibtex = scholarly.bibtex(publication))
-    #     insertCoauthor(pid, rid)
-    #     counter += 1    
+# while publication is not None and counter < 5:
+#     publication = next(search_query, None)
+#     #print(publication)
+#     pid = insertPublication(ptitle = publication["bib"]["title"], pyear = publication["bib"]["pub_year"], venue = publication["bib"]["venue"], scholarurl = publication["pub_url"], bibtex = scholarly.bibtex(publication))
+#     insertCoauthor(pid, rid)
+#     counter += 1
 
 
 @app.route("/cv_sent", methods=['POST', 'GET'])
@@ -41,7 +41,7 @@ def cv_sent():
         rname = name + " " + surname
         website_url = result["Url"]
         #rid = insertResearcher(name, surname)
-        #get_pubs(rid)
+        # get_pubs(rid)
         url = None
         persons = []
 
@@ -67,17 +67,20 @@ def cv_sent():
                 try:
                     ftxt = open(filename, 'r')
                     content = ftxt.readlines()
-                    txt_person = process_keyword_analysis(lines=content, rname=rname)
+                    txt_person = process_keyword_analysis(
+                        lines=content, rname=rname)
                     persons.append(txt_person)
-                    #process_ner(content)
+                    # process_ner(content)
                     #predict_entities(resume_text=content, researcherid = rid, rname=name+" "+surname)
                 except Exception as e:
                     print(e)
                     print("txt not found")
             elif '.doc' in filename:
                 try:
-                    content = split_newline(textract.process(filename).decode('utf-8'))
-                    doc_person = process_keyword_analysis(lines=content, rname=rname)
+                    content = split_newline(
+                        textract.process(filename).decode('utf-8'))
+                    doc_person = process_keyword_analysis(
+                        lines=content, rname=rname)
                     persons.append(doc_person)
                     #predict_entities(resume_text=content, researcherid = rid, rname=name+" "+surname)
                 except Exception as e:
@@ -85,9 +88,10 @@ def cv_sent():
             elif '.pdf' in filename:
                 try:
                     content = parse_pdf_tika(filename).splitlines()
-                    pdf_person = process_keyword_analysis(content, rname=name+" "+surname)
+                    pdf_person = process_keyword_analysis(
+                        content, rname=name+" "+surname)
                     persons.append(pdf_person)
-                    #process_keyword_analysis(extract_text(filename).splitlines())
+                    # process_keyword_analysis(extract_text(filename).splitlines())
                     #content = condense_newline(extract_text(filename))
                     #predict_entities(resume_text=content, researcherid = rid, rname=name+" "+surname)
                 except Exception as e:
@@ -103,12 +107,14 @@ def cv_sent():
             person["file_path"] = create_pdf_from_person(person)
             # insert_person(person=person)
         session["persons"] = persons
-        #return redirect(url_for('cv_create', researcherid = rid))
+        # return redirect(url_for('cv_create', researcherid = rid))
         return redirect(url_for('select_people'))
+
 
 @app.route("/")
 def index():
     return render_template("index.html")
+
 
 @app.route("/select_people", methods=['POST', 'GET'])
 def select_people():
@@ -119,7 +125,7 @@ def select_people():
         return "Please add people parameter"
     # if rid is None:
     #     return "Please add researcherid parameter"
-    
+
     people_tabs = ""
     people_contents = ""
     for i, person in enumerate(people):
@@ -135,7 +141,7 @@ def select_people():
         isActive = ""
         if(i == 0):
             isActive = "show active"
-        
+
         personal_html = f'''<h2> CV </h2>
         <table> 
             <tr> 
@@ -159,8 +165,7 @@ def select_people():
                 <td> {person["personal"]["address"].title() if "address" in person["personal"] else ""} </td> 
             </tr>
         </table>'''
-        
-        
+
         education_html = "<h3> Education </h3> <table> <tr> <th> Degree </th> <th> Department </th> <th> University </th> <th> Date </th> </tr>"
         for education in person["education"]:
             education_html += f'''
@@ -188,19 +193,19 @@ def select_people():
             skill_html += f'''<div>
             <p> {skill.title()} </p>
             </div>'''
-        
+
         award_html = "<h3> Awards </h3>"
         for award in person["awards"]:
             award_html += f'''<div>
             <p> {award.title()} </p>
             </div>'''
-        
+
         service_html = "<h3> Services </h3>"
         for service in person["services"]:
             service_html += f'''<div>
             <p> {service.title()} </p>
             </div>'''
-        
+
         course_html = "<h3> Courses </h3>"
         for course in person["courses"]:
             course_html += f'''<div>
@@ -222,6 +227,11 @@ def select_people():
             {award_html}
             {service_html}
             {course_html}
+            <form action='/download_file?filepath="{person["file_path"]}"' enctype=multipart/form-data method="POST" >
+                <div style="display: flex; flex-direction: column;">
+                    <button class="btn btn-primary mt-4" type="submit">Download CV</button>
+                </div>
+            </form>
         </div>
         '''
     return f"""
@@ -297,6 +307,14 @@ def cv_create():
     """
 
 
+@app.route('/download_file')  # this is a job for GET, not POST
+def download_file():
+    file_path = request.args.get('file_path')
+    return send_file(file_path,
+                     #  mimetype='text/csv',
+                     attachment_filename='CV.pdf',
+                     as_attachment=True)
+
 # @app.route('/predict', methods=['POST'])
 # def predict_api():
 #     if request.method == 'POST':
@@ -304,7 +322,8 @@ def cv_create():
 #         resume_text = preprocess_data(data)
 #         entities = predict(model, TOKENIZER, idx2tag,
 #                            DEVICE, resume_text, MAX_LEN)
-#         return jsonify({'entities': entities})  
+#         return jsonify({'entities': entities})
+
 
 if __name__ == '__main__':
     app.run(debug=True)
