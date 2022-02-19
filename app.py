@@ -3,7 +3,7 @@ from flask_session import Session
 from server.utils import preprocess_data, predict, idx2tag
 from werkzeug.utils import secure_filename
 from werkzeug.datastructures import  FileStorage
-from preprocess import parse_html,condense_newline,traverse_web_links,parse_pdf_tika,split_newline
+from preprocess import create_pdf_from_person, get_combined_people_list, traverse_web_links,parse_pdf_tika,split_newline
 import textract
 from pdfminer.high_level import extract_text
 from scholarly import scholarly
@@ -98,6 +98,10 @@ def cv_sent():
             #          filename))
             #doc_pdf = weasyprint.HTML(url_for('cv_create', researcherid = rid)).write_pdf(name + '_' + surname + '_cv.pdf')
         print(persons)
+        persons = get_combined_people_list(persons)
+        for person in persons:
+            person["file_path"] = create_pdf_from_person(person)
+            # insert_person(person=person)
         session["persons"] = persons
         #return redirect(url_for('cv_create', researcherid = rid))
         return redirect(url_for('select_people'))
@@ -105,88 +109,6 @@ def cv_sent():
 @app.route("/")
 def index():
     return render_template("index.html")
-
-# @app.route("/select_people", methods=['POST', 'GET'])
-# def select_people():
-#     #rid = request.args.get('researcherid')
-#     people = session["persons"]
-#     print("session", session)
-#     if people is None:
-#         return "Please add people parameter"
-#     # if rid is None:
-#     #     return "Please add researcherid parameter"
-    
-#     people_tabs = ""
-#     people_contents = ""
-#     for i, person in enumerate(people):
-#         #person = json.loads(person_str)
-#         isActive = ""
-#         if(i == 0):
-#             isActive = "active"
-#         people_tabs += f'''
-#         <li class="nav-item" role="presentation">
-#             <button class="nav-link {isActive}" id="p{i}-tab" data-bs-toggle="tab" href="#p{i}" data-bs-target="#p{i}" type="button" role="tab" aria-controls="home" aria-selected="true">{i}</button>
-#         </li>
-#         '''
-#     for i, person in enumerate(people):
-#         isActive = ""
-#         if(i == 0):
-#             isActive = "show active"
-#         #person = json.loads(person_str)
-#         education_html = "<h3> Education </h3>"
-#         for education in person["education"]:
-#             education_html += f'''<div>
-#             <h5> {education["degree"] if "degree" in education else ""} </h5>
-#             <p> {education["university"] if "university" in education else ""} </p>
-#             <p> {education["department"] if "department" in education else ""} </p>
-#             <p> {education["start_year"] if "start_year" in education else ""} </p>
-#             <p> {education["end_year"] if "end_year" in education else ""} </p>
-#             </div>'''
-#         work_html = "<h3> Work Experience </h3>"
-#         for work in person["work"]:
-#             work_html += f'''<div>
-#             <h5> {work["job_title"] if "job_title" in work else ""} </h5>
-#             <p> {work["work_place"] if "work_place" in work else ""} </p>
-#             <p> {work["department"] if "department" in work else ""} </p>
-#             <p> {work["start_year"] if "start_year" in work else ""} </p>
-#             <p> {work["end_year"] if "end_year" in work else ""} </p>
-#             </div>'''
-#         skill_html = "<h3> Skills </h3>"
-#         for skill in person["skills"]:
-#             skill_html += f'''<div>
-#             <p> {skill} </p>
-#             </div>'''
-#         # pub_html = "<h3> Publications </h3>"
-#         # for pub in pubs:
-#         #     pub_html += f'''<div>
-#         #     <h5> {pub[0]} ({pub[1]}) </h5>
-#         #     </div>'''
-
-#         people_contents += f'''<div class="tab-pane fade {isActive}" id="p{i}" role="tabpanel" aria-labelledby="p{i}-tab">
-#             {education_html}
-#             {work_html}
-#             {skill_html}
-#         </div>
-#         '''
-#     return f"""
-#     <!DOCTYPE html>
-#     <head>
-#         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.2/dist/css/bootstrap.min.css" rel="stylesheet">
-#     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.2/dist/js/bootstrap.bundle.min.js"></script>
-#         <title>Cv Generator</title>
-#     </head>
-#     <body>
-#         <div class="container-fluid p-5 bg-primary text-white text-center">
-#             <h2> Who are you looking for? </h2>
-#             <ul class="nav nav-tabs" id="myTab" role="tablist">
-#             {people_tabs}
-#             </ul>
-#             <div class="tab-content" id="myTabContent">
-#             {people_contents}
-#             </div>
-#         </div>
-#     </body>
-#     """
 
 @app.route("/select_people", methods=['POST', 'GET'])
 def select_people():
@@ -243,10 +165,10 @@ def select_people():
         for education in person["education"]:
             education_html += f'''
             <tr>
-                <td> {education["degree"].title() if "degree" in education else ""} </td>
-                <td> {education["department"].title() if "department" in education else ""} </td>
-                <td> {education["university"].title() if "university" in education else ""} </td>
-                <td> {education["start_year"] if "start_year" in education else ""} - {education["end_year"] if "end_year" in education else ""} </td>
+                <td class= "p-3"> {education["degree"].title() if "degree" in education else ""} </td>
+                <td class= "p-3"> {education["department"].title() if "department" in education else ""} </td>
+                <td class= "p-3"> {education["university"].title() if "university" in education else ""} </td>
+                <td class= "p-3"> {education["start_year"] if "start_year" in education else ""} - {education["end_year"] if "end_year" in education else ""} </td>
             </tr>'''
         education_html += "</table>"
 
@@ -254,10 +176,10 @@ def select_people():
         for work in person["work"]:
             work_html += f'''
             <tr>
-                <td> {work["job_title"].title() if "job_title" in work else ""} </td>
-                <td> {work["department"].title() if "department" in work else ""} </td>
-                <td> {work["work_place"].title() if "work_place" in work else ""} </td>
-                <td> {work["start_year"] if "start_year" in work else ""} - {work["end_year"] if "end_year" in work else ""} </td>
+                <td class= "p-3"> {work["job_title"].title() if "job_title" in work else ""} </td>
+                <td class= "p-3"> {work["department"].title() if "department" in work else ""} </td>
+                <td class= "p-3"> {work["work_place"].title() if "work_place" in work else ""} </td>
+                <td class= "p-3"> {work["start_year"] if "start_year" in work else ""} - {work["end_year"] if "end_year" in work else ""} </td>
             </tr>'''
         work_html += "</table>"
 

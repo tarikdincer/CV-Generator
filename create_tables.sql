@@ -3,13 +3,17 @@ CREATE TABLE IF NOT EXISTS RESEARCHER (
    RName VARCHAR ( 50 ) NOT NULL,
 	RLastName VARCHAR ( 50 ) NOT NULL,
 	ORCHID integer,
+	RMail VARCHAR ( 50 ),
+	RPhone VARCHAR ( 50 ),
+	RWebsite VARCHAR ( 50 ),
+	RAddress VARCHAR ( 200 ),
 	PRIMARY KEY (ResearcherID)
 );
 CREATE TABLE IF NOT EXISTS SERVICE (
 	ServiceID SERIAL UNIQUE NOT NULL,
     SWhere VARCHAR ( 50 ),
 	SRole VARCHAR ( 50 ),
-	SYear Date,
+	SYear integer,
 	ResearcherID integer NOT NULL,
 	FOREIGN KEY (ResearcherID)
     REFERENCES RESEARCHER (ResearcherID),
@@ -18,7 +22,7 @@ CREATE TABLE IF NOT EXISTS SERVICE (
 CREATE TABLE IF NOT EXISTS AWARD (
     AwardID SERIAL UNIQUE NOT NULL,
     AName VARCHAR ( 50 ) NOT NULL,
-	AYear Date,
+	AYear integer,
 	ResearcherID integer NOT NULL,
 	FOREIGN KEY (ResearcherID)
     REFERENCES RESEARCHER (ResearcherID),
@@ -27,8 +31,8 @@ CREATE TABLE IF NOT EXISTS AWARD (
 CREATE TABLE IF NOT EXISTS GIVEN_COURSE (
     CourseID SERIAL UNIQUE NOT NULL,
     CName VARCHAR ( 50 ) NOT NULL,
-	Code integer,
-	CYear Date,
+	Code VARCHAR ( 20 ) NOT NULL,
+	CYear integer,
 	CSemester VARCHAR ( 20 ) ,
     ResearcherID integer NOT NULL,
 	FOREIGN KEY (ResearcherID)
@@ -63,7 +67,7 @@ CREATE TABLE IF NOT EXISTS SUPERVISED_THESIS (
 	STLastName VARCHAR ( 50 ),
 	STDegree VARCHAR ( 20 ),
 	Code integer,
-	CYear Date,
+	CYear integer,
 	CSemester VARCHAR ( 20 ),
 	ResearcherID integer NOT NULL, 
 	PublicationID integer NOT NULL, 
@@ -114,8 +118,8 @@ CREATE TABLE IF NOT EXISTS WORK (
 	OrganizationID integer  NOT NULL, 
 	WTitle VARCHAR ( 50 ),
 	WDepartment VARCHAR ( 50 ),
-	StartYear Date,
-	EndYear Date,
+	StartYear integer,
+	EndYear integer,
 	FOREIGN KEY (OrganizationID)
     REFERENCES ORGANIZATION (OrganizationID),
 	FOREIGN KEY (ResearcherID)
@@ -129,8 +133,8 @@ CREATE TABLE IF NOT EXISTS EDUCATION (
 	OrganizationID integer  NOT NULL, 
 	EDegree VARCHAR ( 50 ),
 	EDepartment VARCHAR ( 50 ),
-	StartYear Date,
-	EndYear Date,
+	StartYear integer,
+	EndYear integer,
 	FOREIGN KEY (OrganizationID)
     REFERENCES ORGANIZATION (OrganizationID),
 	FOREIGN KEY (ResearcherID)
