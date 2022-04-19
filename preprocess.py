@@ -13,7 +13,7 @@ import PyPDF4
 import re
 import io
 from tika import parser
-from process import process_keyword_analysis
+from process import process_keyword_analysis, check_if_same, translate_to_english
 import spacy
 import xml.etree.ElementTree as ET
 import xmltodict
@@ -21,12 +21,11 @@ from lxml import etree
 import json
 from urllib.parse import urlparse
 import urllib.request
-from langdetect import detect
-from deep_translator import GoogleTranslator
 from fpdf import FPDF
-import datetime;
+import datetime
 
 scanned_links = []
+
 
 def download_file(download_url, filename):
     print("pdf downloading: ", download_url)
@@ -262,32 +261,6 @@ def parse_html(html_path):
     return split_newline(html_extractor.get_content_from_url(html_path))
 
 
-def check_if_same(p1, p2):
-    similarity_score = 100
-    if (not (p1["personal"]["mail"] in p2["personal"]["mail"] or p2["personal"]["mail"] in p1["personal"]["mail"])):
-        similarity_score -= 20
-    if (not (p1["personal"]["phone"] in p2["personal"]["phone"] or p2["personal"]["phone"] in p1["personal"]["phone"])):
-        similarity_score -= 20
-    if (not (p1["personal"]["web_site"] in p2["personal"]["web_site"] or p2["personal"]["web_site"] in p1["personal"]["web_site"])):
-        similarity_score -= 20
-
-    for p1_education in p1["education"]:
-        for p2_education in p2["education"]:
-            if((p1_education["degree"] == p2_education["degree"] and not(p1_education["university"] == p2_education["university"]))):
-                similarity_score -= 10
-            if("end_year" in p1_education and "end_year" in p2_education and p1_education["end_year"] == p2_education["end_year"] and not(p1_education["university"] == p2_education["university"])):
-                similarity_score -= 10
-
-    for p1_work in p1["work"]:
-        for p2_work in p2["work"]:
-            if((p1_work["work_place"] == p2_work["work_place"] and not(p1_work["job_title"] == p2_work["job_title"]))):
-                similarity_score -= 10
-            if("end_year" in p1_work and "end_year" in p2_work and p1_education["end_year"] == p2_education["end_year"] and not(p1_education["work_place"] == p2_education["work_place"])):
-                similarity_score -= 10
-
-    return similarity_score > 50
-
-
 def combine_persons(person_1, person_2):
     combined_person = dict()
     combined_person["personal"] = dict()
@@ -386,9 +359,12 @@ def traverse_web_links(rname, url=None):
         for i, pdf in enumerate(pdfs):
             filename = "downloaded_documents/" + rname + "_" + str(i) + ".pdf"
             download_file(pdf, filename)
-            content = parse_pdf_tika(filename).splitlines()
-            pdf_person = process_keyword_analysis(content, rname=rname)
-            person_temp = combine_persons(person_temp, pdf_person)
+            try:
+                content = parse_pdf_tika(filename).splitlines()
+                pdf_person = process_keyword_analysis(content, rname=rname)
+                person_temp = combine_persons(person_temp, pdf_person)
+            except:
+                print("pdf_error")
 
         persons.append(person_temp)
 
@@ -423,7 +399,7 @@ def scan_link(link, counter=1, rname=""):
         pass
     #print("rname", rname)
     #print("content", content)
-    if rname.lower() not in content.lower():
+    if rname.lower().split()[-1] not in content.lower():
         content = ""
 
     if counter != 0:
@@ -460,88 +436,97 @@ def scan_link(link, counter=1, rname=""):
     return block, listed_blocks, content, pdfs
 
 
-def translate_to_english(text):
-    if(len(text) > 1):
-        lang = detect(text)
-        if(lang != "en"):
-            text = GoogleTranslator(source='auto', target='en').translate(text)
-            print("translated from " + lang)
-    return text
-
 def create_pdf_from_person(person):
     pdf = FPDF()
     pdf.add_font("Arial", "", "./fonts/arial.ttf", uni=True)
     pdf.add_page()
 
     pdf.set_font("Arial", size=18, style="B")
-    pdf.cell(0, 8, txt="CV", ln=1, align='C')
+    pdf.multi_cell(0, 8, txt="CV", align='C')
     pdf.set_font("Arial", size=12)
-    pdf.cell(0, 8, txt="Name: " + person["personal"]["name"], ln=1, align='L')
-    pdf.cell(0, 8, txt="Mail: " + person["personal"]["mail"], ln=1, align='L')
-    pdf.cell(0, 8, txt="Phone: " + person["personal"]["phone"], ln=1, align='L')
-    pdf.cell(0, 8, txt="Web Site: " +
-            person["personal"]["web_site"], ln=1, align='L')
-    pdf.cell(0, 8, txt="Address: " +
-            person["personal"]["address"], ln=1, align='L')
+    pdf.multi_cell(0, 8, txt="Name: " +
+                   person["personal"]["name"].title(), align='L')
+    pdf.multi_cell(0, 8, txt="Mail: " +
+                   person["personal"]["mail"], align='L')
+    pdf.multi_cell(0, 8, txt="Phone: " +
+                   person["personal"]["phone"], align='L')
+    pdf.multi_cell(0, 8, txt="Web Site: " +
+                   person["personal"]["web_site"], align='L')
+    pdf.multi_cell(0, 8, txt="Address: " +
+                   person["personal"]["address"].title(), align='L')
 
     if(len(person["education"]) > 0):
         pdf.set_font("Arial", size=18, style="B")
-        pdf.cell(0, 8, txt="", ln=1, align='L')
-        pdf.cell(0, 10, txt="Education", ln=1, align='L')
+        pdf.multi_cell(0, 8, txt="", align='L')
+        pdf.multi_cell(0, 10, txt="Education", align='L')
         pdf.set_font("Arial", size=12)
+
         for x in person["education"]:
-            pdf.cell(0, 8, txt="•" + x["degree"] + ", " + x["department"] + ", " +
-                    x["university"] + ", " + x["start_year"] + "-" + x["end_year"], ln=1, align='L')
+            x["department"] = x["department"] if "department" in x else ""
+            x["university"] = x["university"] if "university" in x else ""
+            x["start_year"] = x["start_year"] if "start_year" in x else ""
+            x["end_year"] = x["end_year"] if "end_year" in x else ""
+            pdf.multi_cell(0, 8, txt=("• " + x["degree"] + ", " + x["department"] + ", " +
+                           x["university"] + ", " + x["start_year"] + "-" + x["end_year"]).title(), align='L')
 
     if(len(person["work"]) > 0):
         pdf.set_font("Arial", size=18, style="B")
-        pdf.cell(0, 8, txt="", ln=1, align='L')
-        pdf.cell(0, 10, txt="Work", ln=1, align='L')
+        pdf.multi_cell(0, 8, txt="", align='L')
+        pdf.multi_cell(0, 10, txt="Work", align='L')
         pdf.set_font("Arial", size=12)
         for x in person["work"]:
-            pdf.cell(0, 8, txt="•" + x["job_title"] + ", " + x["department"] + ", " +
-                    x["work_place"] + ", " + x["start_year"] + "-" + x["end_year"], ln=1, align='L')
+            x["department"] = x["department"] if "department" in x else ""
+            x["work_place"] = x["work_place"] if "work_place" in x else ""
+            x["job_title"] = x["job_title"] if "job_title" in x else ""
+            x["start_year"] = x["start_year"] if "start_year" in x else ""
+            x["end_year"] = x["end_year"] if "end_year" in x else ""
+            pdf.multi_cell(0, 8, txt=("• " + x["job_title"] + ", " + x["department"] + ", " +
+                           x["work_place"] + ", " + x["start_year"] + "-" + x["end_year"]).title(), align='L')
 
     if(len(person["publications"]) > 0):
         pdf.set_font("Arial", size=18, style="B")
-        pdf.cell(0, 8, txt="", ln=1, align='L')
-        pdf.cell(0, 10, txt="Publications", ln=1, align='L')
+        pdf.multi_cell(0, 8, txt="", align='L')
+        pdf.multi_cell(0, 10, txt="Publications", align='L')
         pdf.set_font("Arial", size=12)
         for x in person["publications"]:
-            pdf.cell(0, 8, txt="•" + x["title"] + ", " + x["year"], ln=1, align='L')
+            x["title"] = x["title"] if "title" in x else ""
+            x["year"] = x["year"] if "year" in x else ""
+            pdf.multi_cell(0, 8, txt=("• " + x["title"] +
+                           ", " + str(x["year"])).title(), align='L')
 
     if(len(person["skills"]) > 0):
         pdf.set_font("Arial", size=18, style="B")
-        pdf.cell(0, 8, txt="", ln=1, align='L')
-        pdf.cell(0, 10, txt="Skills", ln=1, align='L')
+        pdf.multi_cell(0, 8, txt="", align='L')
+        pdf.multi_cell(0, 10, txt="Skills", align='L')
         pdf.set_font("Arial", size=12)
         for x in person["skills"]:
-            pdf.cell(0, 8, txt="•" + x, ln=1, align='L')
+            pdf.multi_cell(0, 8, txt="• " + x.title(), align='L')
 
     if(len(person["courses"]) > 0):
         pdf.set_font("Arial", size=18, style="B")
-        pdf.cell(0, 8, txt="", ln=1, align='L')
-        pdf.cell(0, 10, txt="Courses", ln=1, align='L')
+        pdf.multi_cell(0, 8, txt="", align='L')
+        pdf.multi_cell(0, 10, txt="Courses", align='L')
         pdf.set_font("Arial", size=12)
         for x in person["courses"]:
-            pdf.cell(0, 8, txt="•" + x, ln=1, align='L')
+            pdf.multi_cell(0, 8, txt="• " + x.title(), align='L')
 
     if(len(person["awards"]) > 0):
         pdf.set_font("Arial", size=18, style="B")
-        pdf.cell(0, 8, txt="", ln=1, align='L')
-        pdf.cell(0, 10, txt="Awards", ln=1, align='L')
+        pdf.multi_cell(0, 8, txt="", align='L')
+        pdf.multi_cell(0, 10, txt="Awards", align='L')
         pdf.set_font("Arial", size=12)
         for x in person["awards"]:
-            pdf.cell(0, 8, txt="•" + x, ln=1, align='L')
+            pdf.multi_cell(0, 8, txt="• " + x.title(), align='L')
 
     if(len(person["services"]) > 0):
         pdf.set_font("Arial", size=18, style="B")
-        pdf.cell(0, 8, txt="", ln=1, align='L')
-        pdf.cell(0, 10, txt="Services", ln=1, align='L')
+        pdf.multi_cell(0, 8, txt="", align='L')
+        pdf.multi_cell(0, 10, txt="Services", align='L')
         pdf.set_font("Arial", size=12)
         for x in person["services"]:
-            pdf.cell(0, 8, txt="•" + x, ln=1, align='L')
+            pdf.multi_cell(0, 8, txt="• " + x.title(), align='L')
 
-    file_path = "created_cvs/" + person["personal"]["name"] + " " + datetime.datetime.now() + ".pdf"
+    file_path = "created_cvs/" + (person["personal"]["name"] + " " +
+                                  datetime.datetime.now().strftime('%m/%d/%Y') + ".pdf").replace(" ", "").replace('/', "")
     pdf.output(file_path)
     return file_path

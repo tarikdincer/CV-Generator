@@ -1,5 +1,4 @@
 from turtle import pu
-from preprocess import check_if_same, translate_to_english
 from server.utils import preprocess_data, predict, idx2tag
 from transformers import BertTokenizerFast, BertForTokenClassification
 import torch
@@ -12,10 +11,14 @@ import pub_utils
 import psycopg2
 import pyap
 import traceback
+from langdetect import detect
+from deep_translator import GoogleTranslator
 
 conn = psycopg2.connect(database="postgres", user="postgres",
                         password="admin", host="127.0.0.1", port="5432")
 cur = conn.cursor()
+
+nlp = spacy.load('en_core_web_sm', disable=['ner', 'textcat'])
 
 MAX_LEN = 500
 NUM_LABELS = 12
@@ -31,12 +34,10 @@ model.to(DEVICE)
 
 def find_companies_by_pattern(text, work_keywords=["group", "ltd", "llc", "inc", "plc", "holding", "gmbh", "corp", "corporation"]):
     companies = []
-    # load english language model
-    nlp = spacy.load('en_core_web_sm', disable=['ner', 'textcat'])
     patterns = [[{'POS': {"IN": ['PROPN']}, 'OP': '?'}, {'LOWER': {"IN": work_keywords}}, {'POS': 'ADP'}, {'POS': {"IN": ['PROPN', 'NOUN']}}, {'POS': {"IN": ['PROPN', 'NOUN']}, 'OP': '?'}],
                 [{'POS': {"IN": ['PROPN', 'NOUN']}}, {'POS': {"IN": ['PROPN', 'NOUN']}, 'OP': '?'}, {'LOWER': {"IN": work_keywords}}]]
     matcher = Matcher(nlp.vocab)
-    matcher.add("process_1", None, *patterns)
+    matcher.add("process_1", patterns)
     doc = nlp(text)
     matches = matcher(doc)
     for _, start, end in matches:
@@ -46,12 +47,11 @@ def find_companies_by_pattern(text, work_keywords=["group", "ltd", "llc", "inc",
 
 def find_universities_by_pattern(text, university_keywords=["university", "college", "institute", "school"]):
     universities = []
-    # load english language model
-    nlp = spacy.load('en_core_web_sm', disable=['ner', 'textcat'])
+
     patterns = [[{'POS': {"IN": ['PROPN']}, 'OP': '?'}, {'LOWER': {"IN": university_keywords}}, {'POS': 'ADP'}, {'POS': {"IN": ['PROPN', 'NOUN']}}, {'POS': {"IN": ['PROPN', 'NOUN']}, 'OP': '?'}],
                 [{'POS': {"IN": ['PROPN', 'NOUN']}}, {'POS': {"IN": ['PROPN', 'NOUN']}, 'OP': '?'}, {'LOWER': {"IN": university_keywords}}]]
     matcher = Matcher(nlp.vocab)
-    matcher.add("process_1", None, *patterns)
+    matcher.add("process_1", patterns)
     doc = nlp(text)
     matches = matcher(doc)
     for _, start, end in matches:
@@ -62,15 +62,15 @@ def find_universities_by_pattern(text, university_keywords=["university", "colle
 def find_departments_by_pattern(text, department_keywords=["department"], degree_keywords=["ba", "bsc", "bachelor", "llb", "ms", "msc", "meng", "ma", "mba", "llm", "phd", "masters"]):
     departments = []
     # load english language model
-    nlp = spacy.load('en_core_web_sm', disable=['ner', 'textcat'])
-    patterns = [[{'LOWER': {"IN": department_keywords}}, {'LOWER': 'of'}, {'POS': {"IN": ['PROPN', 'NOUN']}}, {'POS': {"IN": ['PROPN', 'NOUN']}, 'OP': '?'}, {'POS': {"IN": ['PROPN', 'NOUN']}, 'OP': '?'}],
-                [{'LOWER': {"IN": department_keywords}}, {'LOWER': 'of'}, {'POS': {"IN": ['PROPN', 'NOUN']}}, {'POS': {"IN": ['PROPN', 'NOUN']}, 'OP': '?'}, {'POS': 'CCONJ'}, {'POS': {"IN": ['PROPN', 'NOUN']}}, {'POS': {"IN": ['PROPN', 'NOUN']}, 'OP': '?'}]]
-    matcher = Matcher(nlp.vocab)
-    matcher.add("process_1", None, *patterns)
-    doc = nlp(text)
-    matches = matcher(doc)
-    for _, start, end in matches:
-        departments.append(" ".join(doc[start:end].text.split()[2:]))
+    # nlp = spacy.load('en_core_web_sm', disable=['ner', 'textcat'])
+    # patterns = [[{'LOWER': {"IN": department_keywords}}, {'LOWER': 'of'}, {'POS': {"IN": ['PROPN', 'NOUN']}}, {'POS': {"IN": ['PROPN', 'NOUN']}, 'OP': '?'}, {'POS': {"IN": ['PROPN', 'NOUN']}, 'OP': '?'}],
+    #             [{'LOWER': {"IN": department_keywords}}, {'LOWER': 'of'}, {'POS': {"IN": ['PROPN', 'NOUN']}}, {'POS': {"IN": ['PROPN', 'NOUN']}, 'OP': '?'}, {'POS': 'CCONJ'}, {'POS': {"IN": ['PROPN', 'NOUN']}}, {'POS': {"IN": ['PROPN', 'NOUN']}, 'OP': '?'}]]
+    # matcher = Matcher(nlp.vocab)
+    # matcher.add("process_1", patterns)
+    # doc = nlp(text)
+    # matches = matcher(doc)
+    # for _, start, end in matches:
+    #     departments.append(" ".join(doc[start:end].text.split()[2:]))
     return departments
 
 
@@ -110,8 +110,49 @@ def contains_word(s, w):
     return f' {w} ' in f' {s} '
 
 
+def translate_to_english(text):
+    try:
+        if(len(text) > 1):
+            lang = detect(text)
+            if(lang != "en"):
+                text = GoogleTranslator(
+                    source='auto', target='en').translate(text)
+                #print("translated from " + lang)
+    except:
+        pass
+        #print("translate error")
+    return text
+
+
+def check_if_same(p1, p2):
+    similarity_score = 100
+    if (not (p1["personal"]["mail"] in p2["personal"]["mail"] or p2["personal"]["mail"] in p1["personal"]["mail"])):
+        similarity_score -= 20
+    if (not (p1["personal"]["phone"] in p2["personal"]["phone"] or p2["personal"]["phone"] in p1["personal"]["phone"])):
+        similarity_score -= 20
+    if (not (p1["personal"]["web_site"] in p2["personal"]["web_site"] or p2["personal"]["web_site"] in p1["personal"]["web_site"])):
+        similarity_score -= 20
+
+    for p1_education in p1["education"]:
+        for p2_education in p2["education"]:
+            if("university" in p1_education and "university" in p2_education):
+                if((p1_education["degree"] == p2_education["degree"] and not(p1_education["university"] == p2_education["university"]))):
+                    similarity_score -= 10
+                if("end_year" in p1_education and "end_year" in p2_education and p1_education["end_year"] == p2_education["end_year"] and not(p1_education["university"] == p2_education["university"])):
+                    similarity_score -= 10
+
+    for p1_work in p1["work"]:
+        for p2_work in p2["work"]:
+            if((p1_work["work_place"] == p2_work["work_place"] and not(p1_work["job_title"] == p2_work["job_title"]))):
+                similarity_score -= 10
+            if("end_year" in p1_work and "end_year" in p2_work and p1_work["end_year"] == p2_work["end_year"] and not(p1_work["work_place"] == p2_work["work_place"])):
+                similarity_score -= 10
+
+    return similarity_score > 50
+
+
 def process_keyword_analysis(lines, tolerance=0.2, starvation=2, rname="", block_threshold=3, block_index=None, listed_block=None, line_by_line=False):
-    lines = [translate_to_english(x) for x in lines]
+    # lines = [translate_to_english(x) for x in lines]
 
     print("lines", lines)
     print("scanned_listed_block", listed_block)
@@ -263,8 +304,7 @@ def process_keyword_analysis(lines, tolerance=0.2, starvation=2, rname="", block
         elif(current_slot == "education"):
             # print("education",line)
             unis = [re.sub(r'[^\w\s]', '', x) for x in universities if re.sub(
-                r'[^\w\s]', '', x) in line if contains_word(line, re.sub(r'[^\w\s]', '', x))]
-            + find_universities_by_pattern(line)
+                r'[^\w\s]', '', x) in line if contains_word(line, re.sub(r'[^\w\s]', '', x))] + find_universities_by_pattern(line)
             deps = [re.sub(r'[^\w\s]', '', x)
                     for x in departments if x in line if contains_word(line, x)]
             degs = [re.sub(r'[^\w\s]', '', x)
@@ -411,9 +451,8 @@ def process_keyword_analysis(lines, tolerance=0.2, starvation=2, rname="", block
                         person["personal"]["web_site"] = web_sites[0]
                 elif(slot == "education"):
                     # print("education",line)
-                    unis = [re.sub(r'[^\w\s]', '', x) for x in universities if re.sub(
-                        r'[^\w\s]', '', x) in line if contains_word(line, re.sub(r'[^\w\s]', '', x))]
-                    + find_universities_by_pattern(line)
+                    unis = [re.sub(r'[^\w\s]', '', x) for x in universities if re.sub(r'[^\w\s]', '', x) in line if contains_word(
+                        line, re.sub(r'[^\w\s]', '', x))] + find_universities_by_pattern(line)
                     deps = [re.sub(r'[^\w\s]', '', x)
                             for x in departments if x in line if contains_word(line, x)]
                     degs = [re.sub(r'[^\w\s]', '', x)
@@ -723,8 +762,10 @@ def get_pubs(rname):
 #######################################################################
 def insertResearcher(rname="", rlastname="", orchid=0, rmail="", rphone="", rwebsite="", raddress=""):
     # todo: ayni kisi varsa onu don
+    if len(raddress) > 190:
+        raddress = raddress[0:190]
     cur.execute(f"INSERT INTO researcher (rname, rlastname, orchid, rmail, rphone, rwebsite, raddress) \
-      VALUES ('{rname}', '{rlastname}', {orchid}, {rmail}, {rphone}, {rwebsite}, {raddress}) RETURNING researcherid;")
+      VALUES ('{rname}', '{rlastname}', '{orchid}', '{rmail}', '{rphone}', '{rwebsite}', '{raddress}') RETURNING researcherid;")
     rows = cur.fetchall()
     conn.commit()
     return rows[0][0]
@@ -732,7 +773,7 @@ def insertResearcher(rname="", rlastname="", orchid=0, rmail="", rphone="", rweb
 
 def insertSkill(sname="", proficiencylevel=0, researcherid=0):
     cur.execute(
-        f"SELECT skillid FROM skill WHERE researcherid= {researcherid} AND sname = {sname}  AND proficiencylevel = {proficiencylevel};")
+        f"SELECT skillid FROM skill WHERE researcherid= {researcherid} AND sname = '{sname}'  AND proficiencylevel = '{proficiencylevel}';")
     awards = cur.fetchall()
     if(len(awards) > 0):
         return awards[0][0]
@@ -744,8 +785,10 @@ def insertSkill(sname="", proficiencylevel=0, researcherid=0):
 
 
 def insertAward(aname="", ayear=0, researcherid=0):
+    if(ayear == ""):
+        ayear = 0
     cur.execute(
-        f"SELECT awardid FROM award WHERE researcherid= {researcherid} AND aname = {aname}  AND ayear = {ayear};")
+        f"SELECT awardid FROM award WHERE researcherid= {researcherid} AND aname = '{aname}'  AND ayear = '{ayear}';")
     awards = cur.fetchall()
     if(len(awards) > 0):
         return awards[0][0]
@@ -757,8 +800,10 @@ def insertAward(aname="", ayear=0, researcherid=0):
 
 
 def insertService(srole="", swhere="", syear=0, researcherid=0):
+    if(syear == ""):
+        syear = 0
     cur.execute(
-        f"SELECT serviceid FROM service WHERE researcherid= {researcherid} AND srole = {srole}  AND swhere = {swhere} AND syear = {syear};")
+        f"SELECT serviceid FROM service WHERE researcherid= {researcherid} AND srole = '{srole}'  AND swhere = '{swhere}' AND syear = '{syear}';")
     services = cur.fetchall()
     if(len(services) > 0):
         return services[0][0]
@@ -770,8 +815,10 @@ def insertService(srole="", swhere="", syear=0, researcherid=0):
 
 
 def insertGivenCourse(cname="", code="", cyear=0, csemester="", researcherid=0):
+    if(cyear == ""):
+        cyear = 0
     cur.execute(
-        f"SELECT courseid FROM given_course WHERE researcherid= {researcherid} AND cname = {cname} AND code = {code}  AND cyear = {cyear} AND csemester = {csemester};")
+        f"SELECT courseid FROM given_course WHERE researcherid= {researcherid} AND cname = '{cname}' AND code = '{code}'  AND cyear = '{cyear}' AND csemester = '{csemester}';")
     awards = cur.fetchall()
     if(len(awards) > 0):
         return awards[0][0]
@@ -783,12 +830,16 @@ def insertGivenCourse(cname="", code="", cyear=0, csemester="", researcherid=0):
 
 
 def insertWork(researcherid=0, organizationid=0, wtitle="", wdepartment="", startyear=0, endyear=0):
+    if(startyear == ""):
+        startyear = 0
+    if(endyear == ""):
+        endyear = 0
     cur.execute(
-        f"SELECT organizationid FROM work WHERE researcherid= {researcherid} AND organizationid = {organizationid} AND wtitle = {wtitle} AND wdepartment = {wdepartment};")
+        f"SELECT organizationid FROM work WHERE researcherid= {researcherid} AND organizationid = {organizationid} AND wtitle = '{wtitle}' AND wdepartment = '{wdepartment}';")
     work = cur.fetchall()
     if(len(work) > 0):
         return work[0][0]
-    cur.execute(f"INSERT INTO work (researcherid, organizationid, wtitle, wdepartment, startyear = 0, endyear = 0) \
+    cur.execute(f"INSERT INTO work (researcherid, organizationid, wtitle, wdepartment, startyear, endyear) \
       VALUES ({researcherid}, {organizationid}, '{wtitle}', '{wdepartment}', '{startyear}', '{endyear}') RETURNING organizationid;")
     rows = cur.fetchall()
     conn.commit()
@@ -796,8 +847,12 @@ def insertWork(researcherid=0, organizationid=0, wtitle="", wdepartment="", star
 
 
 def insertEducation(researcherid=0, organizationid=0, edegree="", edepartment="", startyear=0, endyear=0):
+    if(startyear == ""):
+        startyear = 0
+    if(endyear == ""):
+        endyear = 0
     cur.execute(
-        f"SELECT organizationid FROM education WHERE researcherid= {researcherid} AND organizationid = {organizationid} AND edegree = {edegree} AND edepartment = {edepartment};")
+        f"SELECT organizationid FROM education WHERE researcherid= {researcherid} AND organizationid = {organizationid} AND edegree = '{edegree}' AND edepartment = '{edepartment}';")
     educations = cur.fetchall()
     if(len(educations) > 0):
         return educations[0][0]
@@ -810,7 +865,7 @@ def insertEducation(researcherid=0, organizationid=0, edegree="", edepartment=""
 
 def insertOrganization(oname="", ocity="", ostate="", ocountry=""):
     cur.execute(
-        f"SELECT organizationid FROM organization WHERE oname = {oname};")
+        f"SELECT organizationid FROM organization WHERE oname = '{oname}';")
     orgs = cur.fetchall()
     if(len(orgs) > 0):
         return orgs[0][0]
@@ -822,10 +877,13 @@ def insertOrganization(oname="", ocity="", ostate="", ocountry=""):
 
 
 def insertPublication(ptitle="", pyear=0, ptype="", venue="", doi=0, scholarurl="", bibtex=""):
-    cur.execute(f"SELECT * FROM publication WHERE ptitle = {ptitle};")
+    if(pyear == ""):
+        pyear = 0
+    cur.execute(
+        f"SELECT publicationid FROM publication WHERE ptitle = '{ptitle}';")
     pubs = cur.fetchall()
     if(len(pubs) > 0):
-        return pubs[0]["publicationid"]
+        return pubs[0][0]
     cur.execute(f"INSERT INTO publication (ptitle, pyear, ptype, venue, doi, scholarurl, bibtex) \
       VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING publicationid;", (ptitle, pyear, ptype, venue, doi, scholarurl, bibtex))
     rows = cur.fetchall()
@@ -835,10 +893,10 @@ def insertPublication(ptitle="", pyear=0, ptype="", venue="", doi=0, scholarurl=
 
 def insertCoauthor(publicationid=0, researcherid=0):
     cur.execute(
-        f"SELECT * FROM co_author WHERE researcherid= {researcherid} AND publicationid = {publicationid};")
+        f"SELECT publicationid FROM co_author WHERE researcherid= {researcherid} AND publicationid = {publicationid};")
     co_authors = cur.fetchall()
     if(len(co_authors) > 0):
-        return co_authors[0]["publicationid"]
+        return co_authors[0][0]
     cur.execute(f"INSERT INTO co_author (publicationid, researcherid) \
       VALUES ({publicationid}, {researcherid}) RETURNING publicationid;")
     rows = cur.fetchall()
@@ -905,19 +963,24 @@ def selectWork(researcherid):
 
 def selectOrganization(oname=""):
     cur.execute(
-        f"SELECT oname,ocity,ostate,ocountry FROM organization WHERE oname = {oname};")
+        f"SELECT oname,ocity,ostate,ocountry FROM organization WHERE oname = '{oname}';")
     rows = cur.fetchall()
     return rows
 
 ############################################################################
-def updateResearcher(researcherid = 0, orchid=0, rmail="", rphone="", rwebsite="", raddress=""):
+
+
+def updateResearcher(researcherid=0, orchid=0, rmail="", rphone="", rwebsite="", raddress=""):
     # todo: ayni kisi varsa onu don
-    cur.execute(f"UPDATE researcher SET orchid = {orchid}, rmail = {rmail}, rphone = {rphone}, rwebsite = {rwebsite}, raddress = {raddress} \
-      WHERE researcherid = {researcherid};")
-    rows = cur.fetchall()
+    if len(raddress) > 190:
+        raddress = raddress[0:190]
+    cur.execute(f"UPDATE researcher SET orchid = '{orchid}', rmail = '{rmail}', rphone = '{rphone}', rwebsite = '{rwebsite}', raddress = '{raddress}' \
+      WHERE researcherid = {researcherid} RETURNING researcherid;")
+    cur.fetchall()
     conn.commit()
 
 ############################################################################
+
 
 def insert_person(person):
     r_name = person["personal"]["name"]
@@ -926,14 +989,19 @@ def insert_person(person):
     if(similar_person == {}):
         rid = insertResearcher(rname=r_name[0:r_name.rfind(
             ' ')], rlastname=r_name[r_name.rfind(' ') + 1], rmail=person["personal"]["mail"],
-            rphone=person["personal"]["phone"], rwebsite=person["personal"]["website"], raddress=person["personal"]["address"])
+            rphone=person["personal"]["phone"], rwebsite=person["personal"]["web_site"], raddress=person["personal"]["address"])
     else:
         rid = similar_person["researcher_id"]
-        rmail = person["personal"]["mail"] if similar_person["personal"]["mail"] in person["personal"]["mail"] else similar_person["personal"]["mail"]
-        rphone = person["personal"]["phone"] if similar_person["personal"]["phone"] in person["personal"]["phone"] else similar_person["personal"]["phone"]
-        rwebsite = person["personal"]["web_site"] if similar_person["personal"]["web_site"] in person["personal"]["web_site"] else similar_person["personal"]["web_site"]
-        raddress = person["personal"]["address"] if similar_person["personal"]["address"] in person["personal"]["address"] else similar_person["personal"]["address"]
-        updateResearcher(researcherid=rid,rmail=rmail,rphone=rphone,rwebsite=rwebsite,raddress=raddress)
+        rmail = person["personal"]["mail"] if similar_person["personal"][
+            "mail"] in person["personal"]["mail"] else similar_person["personal"]["mail"]
+        rphone = person["personal"]["phone"] if similar_person["personal"][
+            "phone"] in person["personal"]["phone"] else similar_person["personal"]["phone"]
+        rwebsite = person["personal"]["web_site"] if similar_person["personal"][
+            "web_site"] in person["personal"]["web_site"] else similar_person["personal"]["web_site"]
+        raddress = person["personal"]["address"] if similar_person["personal"][
+            "address"] in person["personal"]["address"] else similar_person["personal"]["address"]
+        updateResearcher(researcherid=rid, rmail=rmail,
+                         rphone=rphone, rwebsite=rwebsite, raddress=raddress)
 
     for education in person["education"]:
         oid = insertOrganization(oname=education["university"])
@@ -943,7 +1011,7 @@ def insert_person(person):
     for work in person["work"]:
         oid = insertOrganization(oname=work["work_place"])
         insertWork(researcherid=rid, organizationid=oid,
-                   wtitle=work["job_title"], wdepartment=work["department"], startyear=education["start_year"], endyear=education["end_year"])
+                   wtitle=work["job_title"], wdepartment=work["department"], startyear=work["start_year"], endyear=work["end_year"])
 
     for pub in person["publications"]:
         pid = insertPublication(ptitle=pub["title"], pyear=pub["year"])
@@ -997,15 +1065,15 @@ def select_person(rid):
 def search_researcher(person):
     r_name = person["personal"]["name"]
     cur.execute(
-        f"SELECT researcherid FROM researcher WHERE rname = {r_name[0:r_name.rfind(' ')]} AND rlastname = {r_name[r_name.rfind(' ') + 1]};")
+        f"SELECT researcherid FROM researcher WHERE rname = '{r_name[0:r_name.rfind(' ')]}' AND rlastname = '{r_name[r_name.rfind(' ') + 1]}';")
     researcher_ids = cur.fetchall()
 
     if(len(researcher_ids) == 0):
         return {}
     else:
         for researcher_id in researcher_ids:
-            person_temp = select_person(rid=researcher_id)
-            if(check_if_same(person,person_temp)):
-                person_temp["researcher_id"] = researcher_id
+            person_temp = select_person(rid=researcher_id[0])
+            if(check_if_same(person, person_temp)):
+                person_temp["researcher_id"] = researcher_id[0]
                 return person_temp
         return {}

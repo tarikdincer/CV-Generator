@@ -1,4 +1,5 @@
 from flask import Flask, jsonify, request, render_template, url_for, redirect, session
+from flask import send_file
 from flask_session import Session
 from server.utils import preprocess_data, predict, idx2tag
 from werkzeug.utils import secure_filename
@@ -105,7 +106,7 @@ def cv_sent():
         persons = get_combined_people_list(persons)
         for person in persons:
             person["file_path"] = create_pdf_from_person(person)
-            # insert_person(person=person)
+            insert_person(person=person)
         session["persons"] = persons
         # return redirect(url_for('cv_create', researcherid = rid))
         return redirect(url_for('select_people'))
@@ -307,9 +308,11 @@ def cv_create():
     """
 
 
-@app.route('/download_file')  # this is a job for GET, not POST
+# this is a job for GET, not POST
+@app.route('/download_file', methods=['POST', 'GET'])
 def download_file():
-    file_path = request.args.get('file_path')
+    file_path = request.args.get('filepath').replace("\"", "")
+    print("Path:", file_path)
     return send_file(file_path,
                      #  mimetype='text/csv',
                      attachment_filename='CV.pdf',

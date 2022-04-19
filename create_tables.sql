@@ -1,18 +1,18 @@
 CREATE TABLE IF NOT EXISTS RESEARCHER (
    ResearcherID SERIAL UNIQUE NOT NULL,
-   RName VARCHAR ( 50 ) NOT NULL,
-	RLastName VARCHAR ( 50 ) NOT NULL,
+   RName VARCHAR ( 250 ) NOT NULL,
+	RLastName VARCHAR ( 250 ) NOT NULL,
 	ORCHID integer,
-	RMail VARCHAR ( 50 ),
-	RPhone VARCHAR ( 50 ),
-	RWebsite VARCHAR ( 50 ),
+	RMail VARCHAR ( 250 ),
+	RPhone VARCHAR ( 250 ),
+	RWebsite VARCHAR ( 250 ),
 	RAddress VARCHAR ( 200 ),
 	PRIMARY KEY (ResearcherID)
 );
 CREATE TABLE IF NOT EXISTS SERVICE (
 	ServiceID SERIAL UNIQUE NOT NULL,
-    SWhere VARCHAR ( 50 ),
-	SRole VARCHAR ( 50 ),
+    SWhere VARCHAR ( 250 ),
+	SRole VARCHAR ( 250 ),
 	SYear integer,
 	ResearcherID integer NOT NULL,
 	FOREIGN KEY (ResearcherID)
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS SERVICE (
 );
 CREATE TABLE IF NOT EXISTS AWARD (
     AwardID SERIAL UNIQUE NOT NULL,
-    AName VARCHAR ( 50 ) NOT NULL,
+    AName VARCHAR ( 2500 ) NOT NULL,
 	AYear integer,
 	ResearcherID integer NOT NULL,
 	FOREIGN KEY (ResearcherID)
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS AWARD (
 );
 CREATE TABLE IF NOT EXISTS GIVEN_COURSE (
     CourseID SERIAL UNIQUE NOT NULL,
-    CName VARCHAR ( 50 ) NOT NULL,
+    CName VARCHAR ( 250 ) NOT NULL,
 	Code VARCHAR ( 20 ) NOT NULL,
 	CYear integer,
 	CSemester VARCHAR ( 20 ) ,
@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS GIVEN_COURSE (
 );
 CREATE TABLE IF NOT EXISTS SKILL (
     SkillID SERIAL UNIQUE NOT NULL,
-    SName VARCHAR ( 50 ) NOT NULL,
+    SName VARCHAR ( 250 ) NOT NULL,
 	ProficiencyLevel integer,
 	ResearcherID integer NOT NULL, 
 	FOREIGN KEY (ResearcherID)
@@ -53,9 +53,9 @@ CREATE TABLE IF NOT EXISTS PUBLICATION (
 	PublicationID SERIAL UNIQUE NOT NULL ,
     PTitle VARCHAR ( 500 ) NOT NULL,
 	PYear VARCHAR( 20 ),
-    PType VARCHAR ( 50 ),
+    PType VARCHAR ( 250 ),
 	Venue VARCHAR ( 500 ),
-	DOI integer UNIQUE,
+	DOI integer,
 	ScholarURL VARCHAR ( 520 ),
 	BibTex VARCHAR ( 2500 ),
 	PRIMARY KEY (PublicationID)
@@ -63,8 +63,8 @@ CREATE TABLE IF NOT EXISTS PUBLICATION (
 );
 CREATE TABLE IF NOT EXISTS SUPERVISED_THESIS (
     SupervisedThesisID SERIAL UNIQUE NOT NULL,
-    STName VARCHAR ( 50 ),
-	STLastName VARCHAR ( 50 ),
+    STName VARCHAR ( 250 ),
+	STLastName VARCHAR ( 250 ),
 	STDegree VARCHAR ( 20 ),
 	Code integer,
 	CYear integer,
@@ -106,39 +106,41 @@ CREATE TABLE IF NOT EXISTS INTEREST (
 );
 CREATE TABLE IF NOT EXISTS ORGANIZATION (
     OrganizationID SERIAL UNIQUE NOT NULL,
-    OName VARCHAR ( 50 ) NOT NULL,
-	OCity VARCHAR ( 50 ),
-	OState VARCHAR ( 50 ),
-	OCountry VARCHAR ( 50 ),
+    OName VARCHAR ( 250 ) NOT NULL,
+	OCity VARCHAR ( 250 ),
+	OState VARCHAR ( 250 ),
+	OCountry VARCHAR ( 250 ),
 	PRIMARY KEY (OrganizationID)
 
 );
 CREATE TABLE IF NOT EXISTS WORK (
+	WorkID SERIAL UNIQUE NOT NULL,
 	ResearcherID integer  NOT NULL ,
 	OrganizationID integer  NOT NULL, 
-	WTitle VARCHAR ( 50 ),
-	WDepartment VARCHAR ( 50 ),
+	WTitle VARCHAR ( 250 ),
+	WDepartment VARCHAR ( 250 ),
 	StartYear integer,
 	EndYear integer,
 	FOREIGN KEY (OrganizationID)
     REFERENCES ORGANIZATION (OrganizationID),
 	FOREIGN KEY (ResearcherID)
     REFERENCES RESEARCHER (ResearcherID),
-	PRIMARY KEY (ResearcherID, OrganizationID)
+	PRIMARY KEY (WorkID)
 
 );
 
 CREATE TABLE IF NOT EXISTS EDUCATION (
+	EducationID SERIAL UNIQUE NOT NULL,
 	ResearcherID integer  NOT NULL ,
 	OrganizationID integer  NOT NULL, 
-	EDegree VARCHAR ( 50 ),
-	EDepartment VARCHAR ( 50 ),
+	EDegree VARCHAR ( 250 ),
+	EDepartment VARCHAR ( 250 ),
 	StartYear integer,
 	EndYear integer,
 	FOREIGN KEY (OrganizationID)
     REFERENCES ORGANIZATION (OrganizationID),
 	FOREIGN KEY (ResearcherID)
     REFERENCES RESEARCHER (ResearcherID),
-	PRIMARY KEY (ResearcherID, OrganizationID)
+	PRIMARY KEY (EducationID)
 
 );
